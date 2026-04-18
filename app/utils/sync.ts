@@ -119,7 +119,12 @@ const MergeStates: StateMerger = {
   },
   [StoreKey.Config]: mergeWithUpdate<AppState[StoreKey.Config]>,
   [StoreKey.Access]: mergeWithUpdate<AppState[StoreKey.Access]>,
-  [StoreKey.Provider]: mergeWithUpdate<AppState[StoreKey.Provider]>,
+  [StoreKey.Provider]: (localState, remoteState) => {
+    // Provider state should be replaced, not merged (arrays would duplicate)
+    const localTime = localState.lastUpdateTime ?? 0;
+    const remoteTime = remoteState.lastUpdateTime ?? 0;
+    return remoteTime >= localTime ? remoteState : localState;
+  },
 };
 
 export function getLocalAppState() {
