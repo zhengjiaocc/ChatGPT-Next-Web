@@ -37,7 +37,11 @@ export function AuthPage() {
         <IconButton
           icon={<LeftIcon />}
           text={Locale.Auth.Return}
-          onClick={() => navigate(Path.Home)}
+          onClick={() => {
+            if (accessStore.isAuthorized()) {
+              navigate(Path.Home);
+            }
+          }}
         ></IconButton>
       </div>
       <div className={clsx("no-dark", styles["auth-logo"])}>
@@ -66,8 +70,10 @@ export function AuthPage() {
           text={Locale.Auth.Confirm}
           type="primary"
           onClick={() => {
-            if (accessStore.isAuthorized()) {
+            if (accessStore.accessCode.trim()) {
               goChat();
+            } else {
+              alert(Locale.Auth.Error ?? "请输入访问密码");
             }
           }}
         />
