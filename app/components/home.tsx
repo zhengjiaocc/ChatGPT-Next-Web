@@ -178,12 +178,13 @@ function Screen() {
     loadAsyncGoogleFont();
   }, []);
 
-  const providerStore = useProviderStore();
+  const providerHydrated = useProviderStore((s) => s._hasHydrated);
 
   useEffect(() => {
-    const hasEnabledProvider = providerStore.providers.some(
-      (p) => p.enabled && p.apiKey,
-    );
+    if (!providerHydrated) return;
+    const hasEnabledProvider = useProviderStore
+      .getState()
+      .providers.some((p) => p.enabled && p.apiKey);
     if (
       !isAuth &&
       !getClientConfig()?.isApp &&
