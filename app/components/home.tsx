@@ -21,6 +21,7 @@ import {
   Route,
   Routes,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 import { SideBar } from "./sidebar";
 import { useAppConfig } from "../store/config";
@@ -28,6 +29,7 @@ import { AuthPage } from "./auth";
 import { getClientConfig } from "../config/client";
 import { type ClientApi, getClientApi } from "../client/api";
 import { useAccessStore } from "../store";
+import { useProviderStore } from "../store/provider";
 import clsx from "clsx";
 import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
 
@@ -160,6 +162,8 @@ export function WindowContent(props: { children: React.ReactNode }) {
 function Screen() {
   const config = useAppConfig();
   const location = useLocation();
+  const navigate = useNavigate();
+  const accessStore = useAccessStore();
   const isArtifact = location.pathname.includes(Path.Artifacts);
   const isHome = location.pathname === Path.Home;
   const isAuth = location.pathname === Path.Auth;
@@ -172,6 +176,23 @@ function Screen() {
 
   useEffect(() => {
     loadAsyncGoogleFont();
+  }, []);
+
+  const providerStore = useProviderStore();
+
+  useEffect(() => {
+    const hasEnabledProvider = providerStore.providers.some(
+      (p) => p.enabled && p.apiKey,
+    );
+    if (
+      !isAuth &&
+      !getClientConfig()?.isApp &&
+      !accessStore.isAuthorized() &&
+      !hasEnabledProvider
+    ) {
+      navigate(Path.Auth);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (isArtifact) {
