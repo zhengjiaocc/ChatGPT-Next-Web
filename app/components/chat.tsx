@@ -731,7 +731,7 @@ export function ChatActions(props: {
                   [ServiceProvider.ByteDance]: "bytedanceApiKey",
                   [ServiceProvider.ChatGLM]: "chatglmApiKey",
                 };
-                const field = keyMap[providerName];
+                const field = providerName ? keyMap[providerName] : undefined;
                 if (field) {
                   useAccessStore.getState().update((s: any) => {
                     s[field] = matched.apiKey;
