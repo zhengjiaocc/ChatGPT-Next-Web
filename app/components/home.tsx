@@ -178,7 +178,12 @@ function Screen() {
   }, []);
 
   useEffect(() => {
-    if (!isAuth && !getClientConfig()?.isApp && !accessStore.isAuthorized()) {
+    if (
+      !isAuth &&
+      !getClientConfig()?.isApp &&
+      !accessStore.isAuthorized() &&
+      !accessStore.accessCode.trim()
+    ) {
       navigate(Path.Auth);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

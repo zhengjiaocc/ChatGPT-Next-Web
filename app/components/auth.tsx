@@ -22,7 +22,7 @@ export function AuthPage() {
       access.openaiApiKey = "";
       access.accessCode = "";
     });
-  }; // Reset access code to empty string
+  };
 
   useEffect(() => {
     if (getClientConfig()?.isApp) {
@@ -31,6 +31,26 @@ export function AuthPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const verify = async () => {
+    const code = accessStore.accessCode.trim();
+    if (!code) {
+      alert(Locale.Auth.Error ?? "请输入访问密码");
+      return;
+    }
+    const res = await fetch("/api/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    const { valid } = await res.json();
+    if (valid) {
+      goChat();
+    } else {
+      alert(Locale.Auth.Error ?? "密码错误");
+      resetAccessCode();
+    }
+  };
+
   return (
     <div className={styles["auth-page"]}>
       <div className={styles["auth-header"]}>
@@ -38,7 +58,7 @@ export function AuthPage() {
           icon={<LeftIcon />}
           text={Locale.Auth.Return}
           onClick={() => {
-            if (accessStore.isAuthorized()) {
+            if (accessStore.accessCode.trim()) {
               navigate(Path.Home);
             }
           }}
@@ -69,13 +89,7 @@ export function AuthPage() {
         <IconButton
           text={Locale.Auth.Confirm}
           type="primary"
-          onClick={() => {
-            if (accessStore.accessCode.trim()) {
-              goChat();
-            } else {
-              alert(Locale.Auth.Error ?? "请输入访问密码");
-            }
-          }}
+          onClick={verify}
         />
       </div>
     </div>
