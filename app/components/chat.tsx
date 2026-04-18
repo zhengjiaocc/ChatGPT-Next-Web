@@ -116,6 +116,7 @@ import { prettyObject } from "../utils/format";
 import { ExportMessageModal } from "./exporter";
 import { getClientConfig } from "../config/client";
 import { useAllModels } from "../utils/hooks";
+import { useProviderStore } from "../store/provider";
 import { ClientApi, MultimodalContent } from "../client/api";
 import { createTTSPlayer } from "../utils/audio";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "../utils/ms_edge_tts";
@@ -508,6 +509,7 @@ export function ChatActions(props: {
   const navigate = useNavigate();
   const chatStore = useChatStore();
   const pluginStore = usePluginStore();
+  const providerStore = useProviderStore();
   const session = chatStore.currentSession();
 
   // switch themes
@@ -700,6 +702,29 @@ export function ChatActions(props: {
                   providerName as ServiceProvider;
                 session.mask.syncGlobalConfig = false;
               });
+              // Inject apiKey from provider store if available
+              const matched = providerStore.providers.find(
+                (p) => p.enabled && p.type === providerName && p.models.includes(model),
+              );
+              if (matched?.apiKey) {
+                const keyMap: Record<string, string> = {
+                  [ServiceProvider.OpenAI]: "openaiApiKey",
+                  [ServiceProvider.Anthropic]: "anthropicApiKey",
+                  [ServiceProvider.Google]: "googleApiKey",
+                  [ServiceProvider.DeepSeek]: "deepseekApiKey",
+                  [ServiceProvider.XAI]: "xaiApiKey",
+                  [ServiceProvider.SiliconFlow]: "siliconflowApiKey",
+                  [ServiceProvider.Moonshot]: "moonshotApiKey",
+                  [ServiceProvider.Alibaba]: "alibabaApiKey",
+                  [ServiceProvider.ByteDance]: "bytedanceApiKey",
+                  [ServiceProvider.ChatGLM]: "chatglmApiKey",
+                };
+                const field = keyMap[providerName];
+                if (field) {
+                  useAccessStore.getState().update((s: any) => { s[field] = matched.apiKey; });
+                  console.log("[Provider] injected apiKey for", providerName, field, matched.apiKey.slice(0, 8) + "...");
+                }
+              }
               if (providerName == "ByteDance") {
                 const selectedModel = models.find(
                   (m) =>
@@ -992,6 +1017,7 @@ function _Chat() {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
   const config = useAppConfig();
+  const providerStore = useProviderStore();
   const fontSize = config.fontSize;
   const fontFamily = config.fontFamily;
 

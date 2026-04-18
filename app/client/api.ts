@@ -11,6 +11,7 @@ import {
   useAccessStore,
   useChatStore,
 } from "../store";
+import { useProviderStore } from "../store/provider";
 import { ChatGPTApi, DalleRequestPayload } from "./platforms/openai";
 import { GeminiProApi } from "./platforms/google";
 import { ClaudeApi } from "./platforms/anthropic";
@@ -241,7 +242,7 @@ export function validString(x: string): boolean {
   return x?.length > 0;
 }
 
-export function getHeaders(ignoreHeaders: boolean = false) {
+export function getHeaders(ignoreHeaders: boolean = false, overrideApiKey?: string) {
   const accessStore = useAccessStore.getState();
   const chatStore = useChatStore.getState();
   let headers: Record<string, string> = {};
@@ -256,6 +257,16 @@ export function getHeaders(ignoreHeaders: boolean = false) {
 
   function getConfig() {
     const modelConfig = chatStore.currentSession().mask.modelConfig;
+    const providerStore = useProviderStore.getState();
+
+    // Check if current model matches a provider store instance
+    const matchedProvider = providerStore.providers.find(
+      (p) =>
+        p.enabled &&
+        p.type === modelConfig.providerName &&
+        p.models.includes(modelConfig.model),
+    );
+
     const isGoogle = modelConfig.providerName === ServiceProvider.Google;
     const isAzure = modelConfig.providerName === ServiceProvider.Azure;
     const isAnthropic = modelConfig.providerName === ServiceProvider.Anthropic;
@@ -298,6 +309,7 @@ export function getHeaders(ignoreHeaders: boolean = false) {
       : isAI302
       ? accessStore.ai302ApiKey
       : accessStore.openaiApiKey;
+    const finalApiKey = overrideApiKey || matchedProvider?.apiKey || apiKey;
     return {
       isGoogle,
       isAzure,
@@ -312,7 +324,7 @@ export function getHeaders(ignoreHeaders: boolean = false) {
       isChatGLM,
       isSiliconFlow,
       isAI302,
-      apiKey,
+      apiKey: finalApiKey,
       isEnabledAccessControl,
     };
   }

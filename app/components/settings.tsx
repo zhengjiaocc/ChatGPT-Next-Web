@@ -32,6 +32,7 @@ import {
   showToast,
 } from "./ui-lib";
 import { ModelConfigList } from "./model-config";
+import { ProviderConfig } from "./provider-config";
 
 import { IconButton } from "./button";
 import {
@@ -661,6 +662,7 @@ export function Settings() {
   const builtinCount = SearchService.count.builtin;
   const customCount = promptStore.getUserPrompts().length ?? 0;
   const [shouldShowPromptModal, setShowPromptModal] = useState(false);
+  const [showProviderModal, setShowProviderModal] = useState(false);
 
   const showUsage = accessStore.isAuthorized();
   useEffect(() => {
@@ -1759,6 +1761,26 @@ export function Settings() {
         </List>
 
         <SyncItems />
+
+        <List>
+          <ListItem title="模型提供商" subTitle="管理 API Key 与可用模型">
+            <IconButton
+              icon={<ConfigIcon />}
+              text={Locale.UI.Config}
+              onClick={() => setShowProviderModal(true)}
+            />
+          </ListItem>
+        </List>
+        {showProviderModal && (
+          <div className="modal-mask">
+            <Modal
+              title="模型提供商"
+              onClose={() => setShowProviderModal(false)}
+            >
+              <ProviderConfig />
+            </Modal>
+          </div>
+        )}
 
         <List>
           <ListItem
