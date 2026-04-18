@@ -299,6 +299,11 @@ function CheckButton() {
     setCheckState("checking");
     const valid = await syncStore.check();
     setCheckState(valid ? "success" : "failed");
+    showToast(
+      valid
+        ? Locale.Settings.Sync.CheckSuccess
+        : Locale.Settings.Sync.CheckFail,
+    );
   }
 
   if (!couldCheck) return null;
@@ -401,7 +406,10 @@ function SyncConfigModal(props: { onClose?: () => void }) {
         {syncStore.provider === ProviderType.WebDAV && (
           <>
             <List>
-              <ListItem title={Locale.Settings.Sync.Config.WebDav.Endpoint}>
+              <ListItem
+                title={Locale.Settings.Sync.Config.WebDav.Endpoint}
+                subTitle={Locale.Settings.Sync.Config.WebDav.EndpointSubTitle}
+              >
                 <input
                   type="text"
                   value={syncStore.webdav.endpoint}
@@ -496,6 +504,7 @@ function SyncItems() {
   }, [syncStore]);
 
   const [showSyncConfigModal, setShowSyncConfigModal] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const stateOverview = useMemo(() => {
     const sessions = chatStore.sessions;
@@ -533,15 +542,22 @@ function SyncItems() {
             />
             {couldSync && (
               <IconButton
-                icon={<ResetIcon />}
+                icon={syncing ? <LoadingIcon /> : <ResetIcon />}
                 text={Locale.UI.Sync}
                 onClick={async () => {
+                  setSyncing(true);
                   try {
                     await syncStore.sync();
-                    showToast(Locale.Settings.Sync.Success);
+                    showToast(
+                      Locale.Settings.Sync.Success +
+                        " - " +
+                        Locale.Settings.Sync.Overview(stateOverview),
+                    );
                   } catch (e) {
                     showToast(Locale.Settings.Sync.Fail);
                     console.error("[Sync]", e);
+                  } finally {
+                    setSyncing(false);
                   }
                 }}
               />
@@ -1459,44 +1475,44 @@ export function Settings() {
     </>
   );
 
-  const ai302ConfigComponent = accessStore.provider === ServiceProvider["302.AI"] && (
+  const ai302ConfigComponent = accessStore.provider ===
+    ServiceProvider["302.AI"] && (
     <>
       <ListItem
-          title={Locale.Settings.Access.AI302.Endpoint.Title}
-          subTitle={
-            Locale.Settings.Access.AI302.Endpoint.SubTitle +
-            AI302.ExampleEndpoint
+        title={Locale.Settings.Access.AI302.Endpoint.Title}
+        subTitle={
+          Locale.Settings.Access.AI302.Endpoint.SubTitle + AI302.ExampleEndpoint
+        }
+      >
+        <input
+          aria-label={Locale.Settings.Access.AI302.Endpoint.Title}
+          type="text"
+          value={accessStore.ai302Url}
+          placeholder={AI302.ExampleEndpoint}
+          onChange={(e) =>
+            accessStore.update(
+              (access) => (access.ai302Url = e.currentTarget.value),
+            )
           }
-        >
-          <input
-            aria-label={Locale.Settings.Access.AI302.Endpoint.Title}
-            type="text"
-            value={accessStore.ai302Url}
-            placeholder={AI302.ExampleEndpoint}
-            onChange={(e) =>
-              accessStore.update(
-                (access) => (access.ai302Url = e.currentTarget.value),
-              )
-            }
-          ></input>
-        </ListItem>
-        <ListItem
-          title={Locale.Settings.Access.AI302.ApiKey.Title}
-          subTitle={Locale.Settings.Access.AI302.ApiKey.SubTitle}
-        >
-          <PasswordInput
-            aria-label={Locale.Settings.Access.AI302.ApiKey.Title}
-            value={accessStore.ai302ApiKey}
-            type="text"
-            placeholder={Locale.Settings.Access.AI302.ApiKey.Placeholder}
-            onChange={(e) => {
-              accessStore.update(
-                (access) => (access.ai302ApiKey = e.currentTarget.value),
-              );
-            }}
-          />
-        </ListItem>
-      </>
+        ></input>
+      </ListItem>
+      <ListItem
+        title={Locale.Settings.Access.AI302.ApiKey.Title}
+        subTitle={Locale.Settings.Access.AI302.ApiKey.SubTitle}
+      >
+        <PasswordInput
+          aria-label={Locale.Settings.Access.AI302.ApiKey.Title}
+          value={accessStore.ai302ApiKey}
+          type="text"
+          placeholder={Locale.Settings.Access.AI302.ApiKey.Placeholder}
+          onChange={(e) => {
+            accessStore.update(
+              (access) => (access.ai302ApiKey = e.currentTarget.value),
+            );
+          }}
+        />
+      </ListItem>
+    </>
   );
 
   return (

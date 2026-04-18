@@ -227,6 +227,8 @@ const en: LocaleType = {
       NotSyncYet: "Not sync yet",
       Success: "Sync Success",
       Fail: "Sync Fail",
+      CheckSuccess: "Connection available",
+      CheckFail: "Connection failed",
 
       Config: {
         Modal: {
@@ -249,6 +251,8 @@ const en: LocaleType = {
 
         WebDav: {
           Endpoint: "WebDAV Endpoint",
+          EndpointSubTitle:
+            "Fill in the writable directory, e.g. /dav/alipan/nextChat/",
           UserName: "User Name",
           Password: "Password",
         },

@@ -225,6 +225,8 @@ const cn = {
       NotSyncYet: "还没有进行过同步",
       Success: "同步成功",
       Fail: "同步失败",
+      CheckSuccess: "连接可用",
+      CheckFail: "连接失败",
 
       Config: {
         Modal: {
@@ -246,6 +248,7 @@ const cn = {
 
         WebDav: {
           Endpoint: "WebDAV 地址",
+          EndpointSubTitle: "需填写到具体可写目录，例如 /dav/alipan/nextChat/",
           UserName: "用户名",
           Password: "密码",
         },

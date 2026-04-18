@@ -18,7 +18,7 @@ export function createWebDavClient(store: SyncStore) {
           method: "GET",
           headers: this.headers(),
         });
-        const success = [201, 200, 404, 405, 301, 302, 307, 308].includes(
+        const success = [201, 200, 405, 301, 302, 307, 308].includes(
           res.status,
         );
         console.log(

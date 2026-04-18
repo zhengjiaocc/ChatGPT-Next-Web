@@ -143,19 +143,20 @@ async function handle(
 
   try {
     fetchResult = await fetch(targetUrl, fetchOptions);
-  } finally {
-    console.log(
-      "[Any Proxy]",
-      targetUrl,
-      {
-        method: method,
-      },
-      {
-        status: fetchResult?.status,
-        statusText: fetchResult?.statusText,
-      },
+  } catch (e) {
+    console.error("[Any Proxy] fetch failed", targetUrl, e);
+    return NextResponse.json(
+      { error: true, msg: "Fetch failed" },
+      { status: 500 },
     );
   }
+
+  console.log(
+    "[Any Proxy]",
+    targetUrl,
+    { method },
+    { status: fetchResult.status, statusText: fetchResult.statusText },
+  );
 
   return fetchResult;
 }
