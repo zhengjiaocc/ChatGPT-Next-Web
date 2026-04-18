@@ -29,7 +29,6 @@ import { AuthPage } from "./auth";
 import { getClientConfig } from "../config/client";
 import { type ClientApi, getClientApi } from "../client/api";
 import { useAccessStore } from "../store";
-import { useProviderStore } from "../store/provider";
 import clsx from "clsx";
 import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
 
@@ -178,19 +177,8 @@ function Screen() {
     loadAsyncGoogleFont();
   }, []);
 
-  const providerHydrated = useProviderStore((s) => s._hasHydrated);
-
   useEffect(() => {
-    if (!providerHydrated) return;
-    const hasEnabledProvider = useProviderStore
-      .getState()
-      .providers.some((p) => p.enabled && p.apiKey);
-    if (
-      !isAuth &&
-      !getClientConfig()?.isApp &&
-      !accessStore.isAuthorized() &&
-      !hasEnabledProvider
-    ) {
+    if (!isAuth && !getClientConfig()?.isApp && !accessStore.isAuthorized()) {
       navigate(Path.Auth);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
