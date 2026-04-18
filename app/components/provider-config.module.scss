@@ -34,10 +34,10 @@
     position: absolute;
     inset: 0;
     background: var(--black);
-    opacity: 0.35;
+    opacity: 0.2;
     border-radius: 20px;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.2s, opacity 0.2s;
 
     &::before {
       content: "";
@@ -54,6 +54,7 @@
 
   input:checked + span {
     background: var(--primary);
+    opacity: 1;
   }
 
   input:checked + span::before {

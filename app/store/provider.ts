@@ -74,7 +74,6 @@ export const useProviderStore = createPersistStore(
         models: [],
         enabled: true,
         supportsDiscovery: true,
-        openaiCompatible: PROVIDER_PRESETS[type]?.openaiCompatible ?? true,
       };
       set((s) => ({ providers: [...s.providers, instance] }));
       return instance.id;
