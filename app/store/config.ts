@@ -16,6 +16,11 @@ import {
 } from "../constant";
 import { createPersistStore } from "../utils/store";
 import type { Voice } from "rt-client";
+import { useUserStore } from "./user";
+
+function isLoggedIn() {
+  return useUserStore.getState().loggedIn;
+}
 
 export type ModelType = (typeof DEFAULT_MODELS)[number]["name"];
 export type TTSModelType = (typeof DEFAULT_TTS_MODELS)[number];
@@ -192,6 +197,27 @@ export const useAppConfig = createPersistStore(
     },
 
     allModels() {},
+
+    async syncToDB() {
+      if (!isLoggedIn()) return;
+      const state = get();
+      const { models, ...config } = state as any;
+      await fetch("/api/db/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
+      });
+    },
+
+    async loadFromDB() {
+      if (!isLoggedIn()) return;
+      const res = await fetch("/api/db/config");
+      if (!res.ok) return;
+      const config = await res.json();
+      if (config && Object.keys(config).length > 0) {
+        set((state) => ({ ...state, ...config }));
+      }
+    },
   }),
   {
     name: StoreKey.Config,

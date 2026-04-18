@@ -41,6 +41,8 @@ import { createEmptyMask, Mask } from "./mask";
 import { executeMcpAction, getAllTools, isMcpEnabled } from "../mcp/actions";
 import { extractMcpJson, isMcpJson } from "../mcp/utils";
 
+import { useUserStore } from "./user";
+
 const localStorage = safeLocalStorage();
 
 export type ChatMessageTool = {
@@ -225,6 +227,34 @@ async function getMcpSystemPrompt(): Promise<string> {
   return MCP_SYSTEM_TEMPLATE.replace("{{ MCP_TOOLS }}", toolsStr);
 }
 
+function isLoggedIn() {
+  return useUserStore.getState().loggedIn;
+}
+
+async function syncSessionToDB(session: ChatSession) {
+  if (!isLoggedIn()) return;
+  await fetch("/api/db/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: session.id,
+      title: session.topic,
+      messages: session.messages,
+      model: session.mask.modelConfig.model,
+      mask: session.mask,
+    }),
+  });
+}
+
+async function deleteSessionFromDB(id: string) {
+  if (!isLoggedIn()) return;
+  await fetch("/api/db/sessions", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+}
+
 const DEFAULT_CHAT_STATE = {
   sessions: [createEmptySession()],
   currentSessionIndex: 0,
@@ -366,6 +396,8 @@ export const useChatStore = createPersistStore(
           currentSessionIndex: nextIndex,
           sessions,
         }));
+
+        deleteSessionFromDB(deletedSession.id);
 
         showToast(
           Locale.Home.DeleteToast,
@@ -726,13 +758,22 @@ export const useChatStore = createPersistStore(
             },
             onFinish(message, responseRes) {
               if (responseRes?.status === 200) {
+                let topic = message;
+                // handle JSON response like {"cause":{"name":"..."}}
+                try {
+                  const parsed = JSON.parse(message.replace(/^```json\s*|```$/g, "").trim());
+                  topic = parsed?.cause?.name ?? parsed?.name ?? parsed?.title ?? message;
+                } catch {}
                 get().updateTargetSession(
                   session,
                   (session) =>
                     (session.topic =
-                      message.length > 0 ? trimTopic(message) : DEFAULT_TOPIC),
+                      topic.length > 0 ? trimTopic(topic) : DEFAULT_TOPIC),
                 );
               }
+            },
+            onError() {
+              // silently ignore title generation errors
             },
           });
         }
@@ -823,11 +864,28 @@ export const useChatStore = createPersistStore(
         if (index < 0) return;
         updater(sessions[index]);
         set(() => ({ sessions }));
+        syncSessionToDB(sessions[index]);
       },
       async clearAllData() {
         await indexedDBStorage.clear();
         localStorage.clear();
         location.reload();
+      },
+      async loadFromDB() {
+        if (!isLoggedIn()) return;
+        const res = await fetch("/api/db/sessions");
+        if (!res.ok) return;
+        const rows = await res.json();
+        if (!Array.isArray(rows) || rows.length === 0) return;
+        const sessions: ChatSession[] = rows.map((r: any) => ({
+          ...createEmptySession(),
+          id: r.id,
+          topic: r.title,
+          messages: r.messages ?? [],
+          mask: r.mask ?? createEmptyMask(),
+          lastUpdate: new Date(r.updated_at).getTime(),
+        }));
+        set({ sessions, currentSessionIndex: 0 });
       },
       setLastInput(lastInput: string) {
         set({

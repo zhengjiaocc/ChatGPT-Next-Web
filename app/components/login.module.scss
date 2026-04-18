@@ -1,0 +1,126 @@
+.page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
+
+.card {
+  background: var(--white);
+  border-radius: 16px;
+  padding: 40px 36px 32px;
+  width: 340px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.logo {
+  transform: scale(1.2);
+  margin-bottom: 16px;
+  align-self: center;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: bold;
+  margin-bottom: 24px;
+  color: var(--black);
+  align-self: center;
+}
+
+.input {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 10px 14px !important;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-in-light);
+  font-size: 14px;
+  background: var(--white);
+  color: var(--black);
+  box-sizing: border-box !important;
+  outline: none;
+  margin-bottom: 12px;
+  display: block;
+  text-align: left !important;
+
+  &:focus {
+    border-color: var(--primary);
+  }
+}
+
+.pwdRow {
+  position: relative;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.pwdInput {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 10px 40px 10px 14px !important;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-in-light);
+  font-size: 14px;
+  background: var(--white);
+  color: var(--black);
+  box-sizing: border-box !important;
+  outline: none;
+  text-align: left !important;
+
+  &:focus { border-color: var(--primary); }
+}
+
+.eyeBtn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  opacity: 0.5;
+
+  &:hover { opacity: 1; }
+
+  svg { width: 18px; height: 18px; }
+}
+
+.error {
+  color: var(--error);
+  font-size: 13px;
+  margin-bottom: 8px;
+  align-self: flex-start;
+}
+
+.success {
+  color: var(--primary);
+  font-size: 13px;
+  margin-bottom: 8px;
+  align-self: flex-start;
+}
+
+.btn {
+  width: 100%;
+  margin-top: 4px;
+  margin-bottom: 8px;
+
+  button {
+    width: 100% !important;
+    justify-content: center;
+  }
+}
+
+.switchMode {
+  font-size: 13px;
+  color: var(--primary);
+  cursor: pointer;
+  margin-top: 4px;
+  align-self: center;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

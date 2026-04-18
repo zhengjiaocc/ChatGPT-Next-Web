@@ -49,6 +49,7 @@ export enum Path {
   Masks = "/masks",
   Plugins = "/plugins",
   Auth = "/auth",
+  Login = "/login",
   Sd = "/sd",
   SdNew = "/sd-new",
   Artifacts = "/artifacts",
@@ -99,6 +100,7 @@ export enum StoreKey {
   SdList = "sd-list",
   Mcp = "mcp-store",
   Provider = "provider-store",
+  User = "user-store",
 }
 
 export const DEFAULT_SIDEBAR_WIDTH = 300;
