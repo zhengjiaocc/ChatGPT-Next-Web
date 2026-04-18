@@ -65,7 +65,11 @@ export function AuthPage() {
         <IconButton
           text={Locale.Auth.Confirm}
           type="primary"
-          onClick={goChat}
+          onClick={() => {
+            if (accessStore.isAuthorized()) {
+              goChat();
+            }
+          }}
         />
       </div>
     </div>
