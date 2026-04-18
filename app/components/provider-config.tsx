@@ -251,7 +251,10 @@ export function ProviderConfig() {
               key={type}
               icon={
                 <span className={styles["tab-icon"]}>
-                  <Avatar model={PROVIDER_ICON_MODEL[type] ?? type} />
+                  <Avatar
+                    model={PROVIDER_ICON_MODEL[type] ?? type}
+                    iconType="provider"
+                  />
                 </span>
               }
               text={`${preset.label}${count > 0 ? ` (${count})` : ""}`}

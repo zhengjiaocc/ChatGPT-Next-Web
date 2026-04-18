@@ -51,14 +51,26 @@ export class ProviderStoreApi implements LLMApi {
       messages.push({ role: v.role, content: getMessageTextContent(v) });
     }
 
+    // Reasoning models only accept temperature=1, top_p=0.95
+    const REASONING_MODEL_KEYWORDS = [
+      "kimi-k",
+      "-thinking",
+      "o1",
+      "o3",
+      "o4-mini",
+    ];
+    const isReasoningModel = REASONING_MODEL_KEYWORDS.some((k) =>
+      modelConfig.model.toLowerCase().includes(k),
+    );
+
     const requestPayload: RequestPayload = {
       messages,
       stream: options.config.stream,
       model: modelConfig.model,
-      temperature: modelConfig.temperature,
+      temperature: isReasoningModel ? 1 : modelConfig.temperature,
       presence_penalty: modelConfig.presence_penalty,
       frequency_penalty: modelConfig.frequency_penalty,
-      top_p: modelConfig.top_p,
+      top_p: isReasoningModel ? 0.95 : modelConfig.top_p,
     };
 
     const headers = {

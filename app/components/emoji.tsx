@@ -46,6 +46,22 @@ export function AvatarPicker(props: {
   );
 }
 
+// Provider brand icons — matched against provider type keyword
+const PROVIDER_ICON_RULES: Array<[icon: any, keywords: string[]]> = [
+  [BotIconOpenAI, ["gpt", "openai"]],
+  [BotIconClaude, ["claude", "anthropic"]],
+  [BotIconGemini, ["gemini"]],
+  [BotIconDeepseek, ["deepseek"]],
+  [BotIconMoonshot, ["moonshot"]],
+  [BotIconQwen, ["qwen"]],
+  [BotIconGrok, ["grok", "xai"]],
+  [BotIconHunyuan, ["hunyuan"]],
+  [BotIconDoubao, ["doubao"]],
+  [BotIconChatglm, ["glm"]],
+  [BotIconSiliconFlow, ["siliconflow"]],
+];
+
+// Model name icons — matched against model name (includes product names like kimi)
 const MODEL_ICON_RULES: Array<[icon: any, keywords: string[]]> = [
   [BotIconOpenAI, ["gpt", "chatgpt", "dall-e", "dalle", "o1", "o3", "o4"]],
   [BotIconClaude, ["claude", "anthropic"]],
@@ -64,11 +80,17 @@ const MODEL_ICON_RULES: Array<[icon: any, keywords: string[]]> = [
   [BotIconSiliconFlow, ["siliconflow"]],
 ];
 
-export function Avatar(props: { model?: ModelType; avatar?: string }) {
+export function Avatar(props: {
+  model?: ModelType;
+  avatar?: string;
+  iconType?: "provider" | "model";
+}) {
   if (props.model) {
     const modelName = props.model.toLowerCase();
+    const rules =
+      props.iconType === "provider" ? PROVIDER_ICON_RULES : MODEL_ICON_RULES;
     let LlmIcon = BotIconDefault;
-    for (const [icon, keywords] of MODEL_ICON_RULES) {
+    for (const [icon, keywords] of rules) {
       if (keywords.some((k) => modelName.includes(k))) {
         LlmIcon = icon;
         break;

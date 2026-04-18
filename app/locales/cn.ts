@@ -557,11 +557,13 @@ const cn = {
     },
     Temperature: {
       Title: "随机性 (temperature)",
-      SubTitle: "值越大，回复越随机",
+      SubTitle:
+        "值越大，回复越随机；推理模型（如 kimi-k2.5、o1）会自动固定为 1",
     },
     TopP: {
       Title: "核采样 (top_p)",
-      SubTitle: "与随机性类似，但不要和随机性一起更改",
+      SubTitle:
+        "与随机性类似，但不要和随机性一起更改；推理模型会自动固定为 0.95",
     },
     MaxTokens: {
       Title: "单次回复限制 (max_tokens)",
