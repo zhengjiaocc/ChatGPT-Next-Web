@@ -143,6 +143,7 @@ export function mergeAppState(localState: AppState, remoteState: AppState) {
     const key = k as T;
     const localStoreState = localState[key];
     const remoteStoreState = remoteState[key];
+    if (!remoteStoreState) return;
     MergeStates[key](localStoreState, remoteStoreState);
   });
 
