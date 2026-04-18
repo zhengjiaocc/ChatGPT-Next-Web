@@ -712,32 +712,6 @@ export function ChatActions(props: {
                   providerName as ServiceProvider;
                 session.mask.syncGlobalConfig = false;
               });
-              const matched = providerStore.providers.find(
-                (p) =>
-                  p.enabled &&
-                  p.type === providerName &&
-                  p.models.includes(model),
-              );
-              if (matched?.apiKey) {
-                const keyMap: Record<string, string> = {
-                  [ServiceProvider.OpenAI]: "openaiApiKey",
-                  [ServiceProvider.Anthropic]: "anthropicApiKey",
-                  [ServiceProvider.Google]: "googleApiKey",
-                  [ServiceProvider.DeepSeek]: "deepseekApiKey",
-                  [ServiceProvider.XAI]: "xaiApiKey",
-                  [ServiceProvider.SiliconFlow]: "siliconflowApiKey",
-                  [ServiceProvider.Moonshot]: "moonshotApiKey",
-                  [ServiceProvider.Alibaba]: "alibabaApiKey",
-                  [ServiceProvider.ByteDance]: "bytedanceApiKey",
-                  [ServiceProvider.ChatGLM]: "chatglmApiKey",
-                };
-                const field = providerName ? keyMap[providerName] : undefined;
-                if (field) {
-                  useAccessStore.getState().update((s: any) => {
-                    s[field] = matched.apiKey;
-                  });
-                }
-              }
               if (providerName == "ByteDance") {
                 const selectedModel = models.find(
                   (m) =>
