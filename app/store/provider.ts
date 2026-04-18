@@ -8,8 +8,9 @@ export interface ProviderInstance {
   label: string;
   apiKey: string;
   baseUrl: string;
-  models: string[]; // discovered models
+  models: string[];
   enabled: boolean;
+  supportsDiscovery: boolean;
 }
 
 // Preset provider types with default base URLs
@@ -45,6 +46,10 @@ export const PROVIDER_PRESETS: Record<
     label: "Moonshot",
     baseUrl: "https://api.moonshot.cn",
   },
+  [ServiceProvider.Alibaba]: {
+    label: "通义千问",
+    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode",
+  },
 };
 
 const DEFAULT_PROVIDER_STATE = {
@@ -54,7 +59,12 @@ const DEFAULT_PROVIDER_STATE = {
 export const useProviderStore = createPersistStore(
   DEFAULT_PROVIDER_STATE,
   (set, get) => ({
-    addProvider(type: ServiceProvider, label: string, apiKey: string, baseUrl: string) {
+    addProvider(
+      type: ServiceProvider,
+      label: string,
+      apiKey: string,
+      baseUrl: string,
+    ) {
       const instance: ProviderInstance = {
         id: nanoid(),
         type,
@@ -63,6 +73,8 @@ export const useProviderStore = createPersistStore(
         baseUrl: baseUrl || PROVIDER_PRESETS[type]?.baseUrl || "",
         models: [],
         enabled: true,
+        supportsDiscovery: true,
+        openaiCompatible: PROVIDER_PRESETS[type]?.openaiCompatible ?? true,
       };
       set((s) => ({ providers: [...s.providers, instance] }));
       return instance.id;
@@ -84,9 +96,7 @@ export const useProviderStore = createPersistStore(
 
     setModels(id: string, models: string[]) {
       set((s) => ({
-        providers: s.providers.map((p) =>
-          p.id === id ? { ...p, models } : p,
-        ),
+        providers: s.providers.map((p) => (p.id === id ? { ...p, models } : p)),
       }));
     },
 

@@ -1,13 +1,26 @@
 import { useState } from "react";
-import { useProviderStore, PROVIDER_PRESETS, ProviderInstance } from "../store/provider";
+import {
+  useProviderStore,
+  PROVIDER_PRESETS,
+  ProviderInstance,
+} from "../store/provider";
 import { ServiceProvider } from "../constant";
-import { List, ListItem, Modal, PasswordInput, showConfirm, showToast } from "./ui-lib";
+import {
+  List,
+  ListItem,
+  Modal,
+  PasswordInput,
+  showConfirm,
+  showToast,
+} from "./ui-lib";
 import { IconButton } from "./button";
+import { Avatar } from "./emoji";
+import { PROVIDER_ICON_MODEL } from "../utils/provider-icons";
 import AddIcon from "../icons/add.svg";
 import DeleteIcon from "../icons/delete.svg";
 import EditIcon from "../icons/edit.svg";
 import ResetIcon from "../icons/reload.svg";
-import DownIcon from "../icons/down.svg";
+import LeftIcon from "../icons/left.svg";
 import styles from "./provider-config.module.scss";
 
 async function discoverModels(
@@ -35,9 +48,26 @@ function ProviderDialog(props: {
   const [label, setLabel] = useState(props.instance?.label ?? "");
   const [apiKey, setApiKey] = useState(props.instance?.apiKey ?? "");
   const [baseUrl, setBaseUrl] = useState(
-    props.instance?.baseUrl ?? PROVIDER_PRESETS[props.type ?? ""]?.baseUrl ?? "",
+    props.instance?.baseUrl ??
+      PROVIDER_PRESETS[props.type ?? ""]?.baseUrl ??
+      "",
   );
+  const [manualModels, setManualModels] = useState<string[]>(
+    props.instance?.models ?? [],
+  );
+  const [supportsDiscovery, setSupportsDiscovery] = useState(
+    props.instance?.supportsDiscovery ?? true,
+  );
+  const [modelInput, setModelInput] = useState("");
   const [discovering, setDiscovering] = useState(false);
+
+  function addModel() {
+    const m = modelInput.trim();
+    if (m && !manualModels.includes(m)) {
+      setManualModels([...manualModels, m]);
+    }
+    setModelInput("");
+  }
 
   async function save() {
     if (!apiKey.trim()) {
@@ -47,17 +77,40 @@ function ProviderDialog(props: {
     setDiscovering(true);
     try {
       const type = props.instance?.type ?? props.type!;
-      const models = await discoverModels(type, apiKey, baseUrl);
+      let models: string[];
+      if (supportsDiscovery) {
+        try {
+          models = await discoverModels(type, apiKey, baseUrl);
+          showToast(`发现 ${models.length} 个模型`);
+        } catch {
+          showToast("自动发现失败，请手动添加模型或关闭模型发现");
+          setDiscovering(false);
+          return;
+        }
+      } else {
+        if (manualModels.length === 0) {
+          showToast("请至少添加一个模型");
+          setDiscovering(false);
+          return;
+        }
+        models = manualModels;
+      }
       if (isEdit) {
-        store.updateProvider(props.instance!.id, { label, apiKey, baseUrl, models });
+        store.updateProvider(props.instance!.id, {
+          label,
+          apiKey,
+          baseUrl,
+          models,
+          supportsDiscovery,
+        });
       } else {
         const id = store.addProvider(type, label, apiKey, baseUrl);
         store.setModels(id, models);
+        store.updateProvider(id, { supportsDiscovery });
       }
-      showToast(`发现 ${models.length} 个模型`);
       props.onClose();
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "发现模型失败");
+      showToast(e instanceof Error ? e.message : "保存失败");
     }
     setDiscovering(false);
   }
@@ -75,7 +128,7 @@ function ProviderDialog(props: {
         actions={[
           <IconButton
             key="save"
-            text={discovering ? "发现模型中..." : "保存"}
+            text={discovering ? "保存中..." : "保存"}
             type="primary"
             onClick={save}
             disabled={discovering}
@@ -106,6 +159,47 @@ function ProviderDialog(props: {
               onChange={(e) => setBaseUrl(e.currentTarget.value)}
             />
           </ListItem>
+          <ListItem title="支持模型发现" subTitle="自动获取可用模型列表">
+            <input
+              type="checkbox"
+              aria-label="支持模型发现"
+              checked={supportsDiscovery}
+              onChange={(e) => setSupportsDiscovery(e.currentTarget.checked)}
+            />
+          </ListItem>
+          {!supportsDiscovery && (
+            <ListItem title="自定义模型" vertical>
+              <div className={styles["manual-models-input"]}>
+                <input
+                  type="text"
+                  value={modelInput}
+                  placeholder="输入模型名，如 claude-opus-4-6"
+                  onChange={(e) => setModelInput(e.currentTarget.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addModel()}
+                />
+                <IconButton icon={<AddIcon />} onClick={addModel} />
+              </div>
+            </ListItem>
+          )}
+          {!supportsDiscovery && manualModels.length > 0 && (
+            <ListItem>
+              <div className={styles["model-tags"]}>
+                {manualModels.map((m) => (
+                  <span key={m} className={styles["model-tag"]}>
+                    {m}
+                    <span
+                      className={styles["model-tag-del"]}
+                      onClick={() =>
+                        setManualModels(manualModels.filter((x) => x !== m))
+                      }
+                    >
+                      ×
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </ListItem>
+          )}
         </List>
       </Modal>
     </div>
@@ -155,6 +249,11 @@ export function ProviderConfig() {
           return (
             <IconButton
               key={type}
+              icon={
+                <span className={styles["tab-icon"]}>
+                  <Avatar model={PROVIDER_ICON_MODEL[type] ?? type} />
+                </span>
+              }
               text={`${preset.label}${count > 0 ? ` (${count})` : ""}`}
               bordered
               className={isActive ? styles["tab-active"] : undefined}
@@ -175,34 +274,82 @@ export function ProviderConfig() {
       <div className={styles["content"]}>
         {tabProviders.length === 0 ? (
           <div className={styles["empty"]}>
-            暂无实例，点击"添加"创建
+            暂无实例，点击&quot;添加&quot;创建
           </div>
         ) : (
           <List>
             {tabProviders.map((p) => (
               <div key={p.id}>
-                <ListItem
-                  title={p.label || PROVIDER_PRESETS[p.type]?.label || p.type}
-                  subTitle={p.models.length > 0 ? `${p.models.length} 个模型` : "未发现模型"}
-                >
-                  <div className={styles["action-row"]}>
-                    {p.models.length > 0 && (
-                      <IconButton
-                        icon={<DownIcon className={expanded === p.id ? styles["icon-up"] : styles["icon-down"]} />}
-                        title={expanded === p.id ? "收起" : "展开模型列表"}
-                        bordered
-                        onClick={() => setExpanded(expanded === p.id ? null : p.id)}
-                      />
-                    )}
-                    <IconButton icon={<ResetIcon />} title="重新发现" disabled={discovering === p.id} onClick={() => rediscover(p)} />
-                    <IconButton icon={<EditIcon />} title="编辑" onClick={() => setDialog({ instance: p })} />
-                    <IconButton icon={<DeleteIcon />} title="删除" onClick={() => remove(p)} />
+                <div className={styles["provider-row"]}>
+                  <div
+                    className={styles["expand-icon"]}
+                    onClick={() =>
+                      p.models.length > 0 &&
+                      setExpanded(expanded === p.id ? null : p.id)
+                    }
+                    data-hidden={p.models.length === 0 ? "true" : undefined}
+                  >
+                    <LeftIcon
+                      className={
+                        expanded === p.id
+                          ? styles["icon-expanded"]
+                          : styles["icon-collapsed"]
+                      }
+                    />
                   </div>
-                </ListItem>
+                  <div className={styles["provider-row-content"]}>
+                    <ListItem
+                      title={
+                        p.label || PROVIDER_PRESETS[p.type]?.label || p.type
+                      }
+                      subTitle={
+                        p.models.length > 0
+                          ? `${p.models.length} 个模型`
+                          : "暂无模型"
+                      }
+                    >
+                      <div className={styles["action-row"]}>
+                        <label className={styles["toggle"]}>
+                          <input
+                            type="checkbox"
+                            aria-label="启用"
+                            checked={p.enabled}
+                            onChange={(e) =>
+                              store.updateProvider(p.id, {
+                                enabled: e.currentTarget.checked,
+                              })
+                            }
+                          />
+                          <span />
+                        </label>
+                        {p.supportsDiscovery && (
+                          <IconButton
+                            icon={<ResetIcon />}
+                            title="重新发现"
+                            disabled={discovering === p.id}
+                            onClick={() => rediscover(p)}
+                          />
+                        )}
+                        <IconButton
+                          icon={<EditIcon />}
+                          title="编辑"
+                          onClick={() => setDialog({ instance: p })}
+                        />
+                        <IconButton
+                          icon={<DeleteIcon />}
+                          title="删除"
+                          onClick={() => remove(p)}
+                        />
+                      </div>
+                    </ListItem>
+                  </div>
+                </div>
                 {expanded === p.id && (
                   <div className={styles["model-tags"]}>
                     {p.models.map((m) => (
-                      <span key={m} className={styles["model-tag"]}>{m}</span>
+                      <span key={m} className={styles["model-tag"]}>
+                        {m}
+                      </span>
                     ))}
                   </div>
                 )}

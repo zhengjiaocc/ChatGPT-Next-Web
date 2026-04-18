@@ -13,6 +13,8 @@ import type {
   RequestMessage,
 } from "../client/api";
 import { getClientApi } from "../client/api";
+import { useProviderStore } from "./provider";
+import { ProviderStoreApi } from "../client/platforms/provider";
 import { ChatControllerPool } from "../client/controller";
 import { showToast } from "../components/ui-lib";
 import {
@@ -456,7 +458,17 @@ export const useChatStore = createPersistStore(
           ]);
         });
 
-        const api: ClientApi = getClientApi(modelConfig.providerName);
+        const matchedProvider = useProviderStore
+          .getState()
+          .providers.find(
+            (p) =>
+              p.enabled &&
+              p.type === modelConfig.providerName &&
+              p.models.includes(modelConfig.model),
+          );
+        const api = matchedProvider
+          ? { llm: new ProviderStoreApi(matchedProvider) }
+          : getClientApi(modelConfig.providerName);
         // make request
         api.llm.chat({
           messages: sendMessages,

@@ -29,6 +29,8 @@
     "@vercel/analytics": "^0.1.11",
     "@vercel/speed-insights": "^1.0.2",
     "axios": "^1.7.5",
+    "baseline-browser-mapping": "^2.10.19",
+    "caniuse-lite": "^1.0.30001788",
     "clsx": "^2.1.1",
     "emoji-picker-react": "^4.9.2",
     "fuse.js": "^7.0.0",

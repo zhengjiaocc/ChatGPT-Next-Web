@@ -5,6 +5,7 @@ import CloseIcon from "../icons/close.svg";
 import EyeIcon from "../icons/eye.svg";
 import EyeOffIcon from "../icons/eye-off.svg";
 import DownIcon from "../icons/down.svg";
+import LeftIcon from "../icons/left.svg";
 import ConfirmIcon from "../icons/confirm.svg";
 import CancelIcon from "../icons/cancel.svg";
 import MaxIcon from "../icons/max.svg";
@@ -23,7 +24,6 @@ import React, {
   useRef,
 } from "react";
 import { IconButton } from "./button";
-import { Avatar } from "./emoji";
 import clsx from "clsx";
 
 export function Popover(props: {
@@ -480,6 +480,10 @@ export function Selector<T>(props: {
     subTitle?: string;
     value: T;
     disable?: boolean;
+    isGroup?: boolean;
+    onHeaderClick?: () => void;
+    icon?: JSX.Element;
+    expanded?: boolean;
   }>;
   defaultSelectedValue?: T[] | T;
   onSelection?: (selection: T[]) => void;
@@ -518,14 +522,40 @@ export function Selector<T>(props: {
             return (
               <ListItem
                 className={clsx(styles["selector-item"], {
-                  [styles["selector-item-disabled"]]: item.disable,
+                  [styles["selector-item-disabled"]]:
+                    item.disable && !item.isGroup,
+                  [styles["selector-item-group"]]: item.isGroup,
                 })}
                 key={i}
                 title={item.title}
                 subTitle={item.subTitle}
-                icon={<Avatar model={item.value as string} />}
+                icon={
+                  item.isGroup ? (
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 4 }}
+                    >
+                      <LeftIcon
+                        style={{
+                          width: 14,
+                          height: 14,
+                          opacity: 0.5,
+                          transform: item.expanded
+                            ? "rotate(270deg)"
+                            : "rotate(180deg)",
+                          transition: "transform 0.2s",
+                        }}
+                      />
+                      {item.icon}
+                    </div>
+                  ) : (
+                    item.icon
+                  )
+                }
                 onClick={(e) => {
-                  if (item.disable) {
+                  if (item.isGroup && item.onHeaderClick) {
+                    e.stopPropagation();
+                    item.onHeaderClick();
+                  } else if (item.disable) {
                     e.stopPropagation();
                   } else {
                     handleSelection(e, item.value);

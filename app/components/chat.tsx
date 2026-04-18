@@ -109,6 +109,7 @@ import {
   UNFINISHED_INPUT,
 } from "../constant";
 import { Avatar } from "./emoji";
+import { ModelSelector } from "./model-selector";
 import { ContextPrompts, MaskAvatar, MaskConfig } from "./mask";
 import { useMaskStore } from "../store/mask";
 import { ChatCommandPrefix, useChatCommand, useCommand } from "../command";
@@ -555,6 +556,9 @@ export function ChatActions(props: {
     return model?.displayName ?? "";
   }, [models, currentModel, currentProviderName]);
   const [showModelSelector, setShowModelSelector] = useState(false);
+  const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(
+    new Set(),
+  );
   const [showPluginSelector, setShowPluginSelector] = useState(false);
   const [showUploadImage, setShowUploadImage] = useState(false);
 
@@ -682,29 +686,37 @@ export function ChatActions(props: {
         />
 
         {showModelSelector && (
-          <Selector
-            defaultSelectedValue={`${currentModel}@${currentProviderName}`}
-            items={models.map((m) => ({
-              title: `${m.displayName}${
-                m?.provider?.providerName
-                  ? " (" + m?.provider?.providerName + ")"
-                  : ""
-              }`,
-              value: `${m.name}@${m?.provider?.providerName}`,
-            }))}
+          <ModelSelector
+            groups={(() => {
+              const groups = new Map<string, typeof models>();
+              for (const m of models) {
+                const key = m?.provider?.providerName ?? "其他";
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key)!.push(m);
+              }
+              return Array.from(groups.entries()).map(([provider, ms]) => ({
+                provider,
+                models: ms.map((m) => ({
+                  name: m.name,
+                  displayName: m.displayName,
+                })),
+              }));
+            })()}
+            currentValue={`${currentModel}@${currentProviderName}`}
             onClose={() => setShowModelSelector(false)}
-            onSelection={(s) => {
-              if (s.length === 0) return;
-              const [model, providerName] = getModelProvider(s[0]);
+            onSelect={(s) => {
+              const [model, providerName] = getModelProvider(s);
               chatStore.updateTargetSession(session, (session) => {
                 session.mask.modelConfig.model = model as ModelType;
                 session.mask.modelConfig.providerName =
                   providerName as ServiceProvider;
                 session.mask.syncGlobalConfig = false;
               });
-              // Inject apiKey from provider store if available
               const matched = providerStore.providers.find(
-                (p) => p.enabled && p.type === providerName && p.models.includes(model),
+                (p) =>
+                  p.enabled &&
+                  p.type === providerName &&
+                  p.models.includes(model),
               );
               if (matched?.apiKey) {
                 const keyMap: Record<string, string> = {
@@ -721,8 +733,9 @@ export function ChatActions(props: {
                 };
                 const field = keyMap[providerName];
                 if (field) {
-                  useAccessStore.getState().update((s: any) => { s[field] = matched.apiKey; });
-                  console.log("[Provider] injected apiKey for", providerName, field, matched.apiKey.slice(0, 8) + "...");
+                  useAccessStore.getState().update((s: any) => {
+                    s[field] = matched.apiKey;
+                  });
                 }
               }
               if (providerName == "ByteDance") {

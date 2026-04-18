@@ -21,6 +21,7 @@ import BotIconGrok from "../icons/llm-icons/grok.svg";
 import BotIconHunyuan from "../icons/llm-icons/hunyuan.svg";
 import BotIconDoubao from "../icons/llm-icons/doubao.svg";
 import BotIconChatglm from "../icons/llm-icons/chatglm.svg";
+import BotIconSiliconFlow from "../icons/llm-icons/siliconflow.svg";
 
 export function getEmojiUrl(unified: string, style: EmojiStyle) {
   // Whoever owns this Content Delivery Network (CDN), I am using your CDN to serve emojis
@@ -45,53 +46,34 @@ export function AvatarPicker(props: {
   );
 }
 
-export function Avatar(props: { model?: ModelType; avatar?: string }) {
-  let LlmIcon = BotIconDefault;
+const MODEL_ICON_RULES: Array<[icon: any, keywords: string[]]> = [
+  [BotIconOpenAI, ["gpt", "chatgpt", "dall-e", "dalle", "o1", "o3", "o4"]],
+  [BotIconClaude, ["claude", "anthropic"]],
+  [BotIconGemini, ["gemini"]],
+  [BotIconGemma, ["gemma"]],
+  [BotIconDeepseek, ["deepseek"]],
+  [BotIconMoonshot, ["moonshot", "kimi"]],
+  [BotIconQwen, ["qwen", "qwq", "qvq"]],
+  [BotIconGrok, ["grok", "xai"]],
+  [BotIconMeta, ["llama", "meta"]],
+  [BotIconMistral, ["mixtral", "mistral", "codestral"]],
+  [BotIconWenxin, ["ernie", "wenxin"]],
+  [BotIconHunyuan, ["hunyuan"]],
+  [BotIconDoubao, ["doubao", "ep-"]],
+  [BotIconChatglm, ["glm", "cogview-", "cogvideox-"]],
+  [BotIconSiliconFlow, ["siliconflow"]],
+];
 
+export function Avatar(props: { model?: ModelType; avatar?: string }) {
   if (props.model) {
     const modelName = props.model.toLowerCase();
-
-    if (
-      modelName.startsWith("gpt") ||
-      modelName.startsWith("chatgpt") ||
-      modelName.startsWith("dall-e") ||
-      modelName.startsWith("dalle") ||
-      modelName.startsWith("o1") ||
-      modelName.startsWith("o3")
-    ) {
-      LlmIcon = BotIconOpenAI;
-    } else if (modelName.startsWith("gemini")) {
-      LlmIcon = BotIconGemini;
-    } else if (modelName.startsWith("gemma")) {
-      LlmIcon = BotIconGemma;
-    } else if (modelName.startsWith("claude")) {
-      LlmIcon = BotIconClaude;
-    } else if (modelName.includes("llama")) {
-      LlmIcon = BotIconMeta;
-    } else if (modelName.startsWith("mixtral") || modelName.startsWith("codestral")) {
-      LlmIcon = BotIconMistral;
-    } else if (modelName.includes("deepseek")) {
-      LlmIcon = BotIconDeepseek;
-    } else if (modelName.startsWith("moonshot")) {
-      LlmIcon = BotIconMoonshot;
-    } else if (modelName.startsWith("qwen")) {
-      LlmIcon = BotIconQwen;
-    } else if (modelName.startsWith("ernie")) {
-      LlmIcon = BotIconWenxin;
-    } else if (modelName.startsWith("grok")) {
-      LlmIcon = BotIconGrok;
-    } else if (modelName.startsWith("hunyuan")) {
-      LlmIcon = BotIconHunyuan;
-    } else if (modelName.startsWith("doubao") || modelName.startsWith("ep-")) {
-      LlmIcon = BotIconDoubao;
-    } else if (
-      modelName.includes("glm") ||
-      modelName.startsWith("cogview-") ||
-      modelName.startsWith("cogvideox-")
-    ) {
-      LlmIcon = BotIconChatglm;
+    let LlmIcon = BotIconDefault;
+    for (const [icon, keywords] of MODEL_ICON_RULES) {
+      if (keywords.some((k) => modelName.includes(k))) {
+        LlmIcon = icon;
+        break;
+      }
     }
-
     return (
       <div className="no-dark">
         <LlmIcon className="user-avatar" width={30} height={30} />

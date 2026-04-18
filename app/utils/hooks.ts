@@ -9,15 +9,21 @@ export function useAllModels() {
   const providerStore = useProviderStore();
 
   const models = useMemo(() => {
-    // Convert provider store models to customModels string format
     const providerModels = providerStore.providers
       .filter((p) => p.enabled && p.models.length > 0)
       .flatMap((p) => p.models.map((m) => `+${m}@${p.type}`))
       .join(",");
 
+    // If provider store has models, only show those; otherwise fall back to defaults
+    const hasProviderModels = providerModels.length > 0;
+    const baseModels = hasProviderModels ? [] : configStore.models;
+    const customModels = hasProviderModels
+      ? providerModels
+      : [configStore.customModels, accessStore.customModels].join(",");
+
     return collectModelsWithDefaultModel(
-      configStore.models,
-      [configStore.customModels, accessStore.customModels, providerModels].join(","),
+      baseModels,
+      customModels,
       accessStore.defaultModel,
     );
   }, [
@@ -30,4 +36,3 @@ export function useAllModels() {
 
   return models;
 }
-
