@@ -34,7 +34,7 @@ export function AuthPage() {
   const verify = async () => {
     const code = accessStore.accessCode.trim();
     if (!code) {
-      alert(Locale.Auth.Error ?? "请输入访问密码");
+      alert("请输入访问密码");
       return;
     }
     const res = await fetch("/api/verify", {
@@ -46,7 +46,7 @@ export function AuthPage() {
     if (valid) {
       goChat();
     } else {
-      alert(Locale.Auth.Error ?? "密码错误");
+      alert("密码错误");
       resetAccessCode();
     }
   };
