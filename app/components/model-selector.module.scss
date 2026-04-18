@@ -110,6 +110,11 @@
   cursor: pointer;
   border-bottom: var(--border-in-light);
 
+  :global(.user-avatar) {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
   &:hover {
     background: var(--hover-color);
   }
@@ -209,6 +214,11 @@
   padding: 12px 14px;
   cursor: pointer;
   transition: background 0.15s;
+
+  :global(.user-avatar) {
+    width: 20px !important;
+    height: 20px !important;
+  }
 
   &:hover {
     background: var(--hover-color);

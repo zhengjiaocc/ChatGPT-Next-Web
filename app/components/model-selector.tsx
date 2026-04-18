@@ -116,7 +116,7 @@ export function ModelSelector(props: {
                 {activeProvider ?? "模型"}
               </div>
               {filteredModels?.map((m) => {
-                const value = `${m.name}@${activeGroup.provider}`;
+                const value = `${m.name}@${activeGroup?.provider}`;
                 const selected = value === props.currentValue;
                 return (
                   <div
