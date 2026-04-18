@@ -41,6 +41,7 @@ import {
   useAccessStore,
   useAppConfig,
 } from "../store";
+import { useUserStore } from "../store/user";
 
 import Locale, {
   AllLangs,
@@ -229,9 +230,22 @@ function UserPromptModal(props: { onClose?: () => void }) {
 function DangerItems() {
   const chatStore = useChatStore();
   const appConfig = useAppConfig();
+  const navigate = useNavigate();
+  const userStore = useUserStore();
+
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    userStore.logout();
+    navigate(Path.Login);
+  };
 
   return (
     <List>
+      {userStore.loggedIn && (
+        <ListItem title="退出登录" subTitle={`当前用户：${userStore.username}`}>
+          <IconButton text="退出" onClick={logout} type="danger" />
+        </ListItem>
+      )}
       <ListItem
         title={Locale.Settings.Danger.Reset.Title}
         subTitle={Locale.Settings.Danger.Reset.SubTitle}
@@ -745,38 +759,21 @@ export function Settings() {
             </Popover>
           </ListItem>
 
+          <ListItem title="头像 URL" subTitle="输入图片链接替换头像">
+            <input
+              type="text"
+              placeholder="https://..."
+              value={config.avatar?.startsWith("http") ? config.avatar : ""}
+              onChange={(e) => {
+                const val = e.currentTarget.value.trim();
+                updateConfig((config) => (config.avatar = val || config.avatar));
+              }}
+            />
+          </ListItem>
+
           <ListItem
             title={Locale.Settings.Update.Version(currentVersion ?? "unknown")}
-            subTitle={
-              checkingUpdate
-                ? Locale.Settings.Update.IsChecking
-                : hasNewVersion
-                ? Locale.Settings.Update.FoundUpdate(remoteId ?? "ERROR")
-                : Locale.Settings.Update.IsLatest
-            }
-          >
-            {checkingUpdate ? (
-              <LoadingIcon />
-            ) : hasNewVersion ? (
-              clientConfig?.isApp ? (
-                <IconButton
-                  icon={<ResetIcon></ResetIcon>}
-                  text={Locale.Settings.Update.GoToUpdate}
-                  onClick={() => clientUpdate()}
-                />
-              ) : (
-                <Link href={updateUrl} target="_blank" className="link">
-                  {Locale.Settings.Update.GoToUpdate}
-                </Link>
-              )
-            ) : (
-              <IconButton
-                icon={<ResetIcon></ResetIcon>}
-                text={Locale.Settings.Update.CheckUpdate}
-                onClick={() => checkUpdate(true)}
-              />
-            )}
-          </ListItem>
+          />
 
           <ListItem title={Locale.Settings.SendKey}>
             <Select

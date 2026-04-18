@@ -105,7 +105,13 @@ export function Avatar(props: {
 
   return (
     <div className="user-avatar">
-      {props.avatar && <EmojiAvatar avatar={props.avatar} />}
+      {props.avatar && (
+        props.avatar.startsWith("http") ? (
+          <img src={props.avatar} alt="avatar" className="user-avatar-img" />
+        ) : (
+          <EmojiAvatar avatar={props.avatar} />
+        )
+      )}
     </div>
   );
 }

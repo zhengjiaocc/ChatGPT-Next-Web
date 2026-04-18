@@ -26,9 +26,12 @@ import {
 import { SideBar } from "./sidebar";
 import { useAppConfig } from "../store/config";
 import { AuthPage } from "./auth";
+import { LoginPage } from "./login";
 import { getClientConfig } from "../config/client";
 import { type ClientApi, getClientApi } from "../client/api";
-import { useAccessStore } from "../store";
+import { useChatStore, useAccessStore } from "../store";
+import { useProviderStore } from "../store/provider";
+import { useUserStore } from "../store/user";
 import clsx from "clsx";
 import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
 
@@ -163,9 +166,11 @@ function Screen() {
   const location = useLocation();
   const navigate = useNavigate();
   const accessStore = useAccessStore();
+  const userStore = useUserStore();
   const isArtifact = location.pathname.includes(Path.Artifacts);
   const isHome = location.pathname === Path.Home;
   const isAuth = location.pathname === Path.Auth;
+  const isLogin = location.pathname === Path.Login;
   const isSd = location.pathname === Path.Sd;
   const isSdNew = location.pathname === Path.SdNew;
 
@@ -178,13 +183,9 @@ function Screen() {
   }, []);
 
   useEffect(() => {
-    if (
-      !isAuth &&
-      !getClientConfig()?.isApp &&
-      !accessStore.isAuthorized() &&
-      !accessStore.accessCode.trim()
-    ) {
-      navigate(Path.Auth);
+    if (isLogin || isAuth || getClientConfig()?.isApp) return;
+    if (!userStore.loggedIn && !accessStore.isAuthorized() && !accessStore.accessCode.trim()) {
+      navigate(Path.Login);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -223,6 +224,8 @@ function Screen() {
     );
   };
 
+  if (isLogin) return <LoginPage />;
+
   return (
     <div
       className={clsx(styles.container, {
@@ -237,10 +240,10 @@ function Screen() {
 
 export function useLoadData() {
   const config = useAppConfig();
-
   const api: ClientApi = getClientApi(config.modelConfig.providerName);
 
   useEffect(() => {
+    if (!useUserStore.getState().loggedIn) return;
     (async () => {
       const models = await api.llm.models();
       config.mergeModels(models);
@@ -258,6 +261,12 @@ export function Home() {
     console.log("[Config] got config from build time", getClientConfig());
     useAccessStore.getState().fetch();
 
+    if (useUserStore.getState().loggedIn) {
+      useChatStore.getState().loadFromDB();
+      useProviderStore.getState().loadFromDB();
+      useAppConfig.getState().loadFromDB();
+    }
+
     const initMcp = async () => {
       try {
         const enabled = await isMcpEnabled();
@@ -274,7 +283,7 @@ export function Home() {
   }, []);
 
   if (!useHasHydrated()) {
-    return <Loading />;
+    return null;
   }
 
   return (

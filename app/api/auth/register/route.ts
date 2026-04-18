@@ -1,0 +1,29 @@
+import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import sql from "../../../lib/db";
+import { verifyTurnstile } from "../../../lib/turnstile";
+
+export async function POST(req: NextRequest) {
+  const { username, password, turnstileToken } = await req.json();
+
+  if (!(await verifyTurnstile(turnstileToken ?? ""))) {
+    return NextResponse.json({ error: "人机验证失败" }, { status: 400 });
+  }
+
+  if (!username?.trim() || !password?.trim()) {
+    return NextResponse.json({ error: "用户名和密码不能为空" }, { status: 400 });
+  }
+
+  const existing = await sql`SELECT id FROM users WHERE username = ${username}`;
+  if (existing.length > 0) {
+    return NextResponse.json({ error: "用户名已存在" }, { status: 409 });
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+  const result = await sql`
+    INSERT INTO users (username, password_hash) VALUES (${username}, ${hash})
+    RETURNING id, username
+  `;
+
+  return NextResponse.json({ user: result[0] });
+}
