@@ -588,7 +588,7 @@ export function ChatActions(props: {
     // if current model is not available
     // switch to first available model
     const isUnavailableModel = !models.some((m) => m.name === currentModel);
-    if (isUnavailableModel && models.length > 0) {
+    if (isUnavailableModel && models.length > 0 && chatStore.dbLoaded) {
       // show next model to default model if exist
       let nextModel = models.find((model) => model.isDefault) || models[0];
       chatStore.updateTargetSession(session, (session) => {
@@ -610,6 +610,7 @@ export function ChatActions(props: {
       <>
         {couldStop && (
           <ChatAction
+            key="stop"
             onClick={stopAll}
             text={Locale.Chat.InputActions.Stop}
             icon={<StopIcon />}
@@ -617,6 +618,7 @@ export function ChatActions(props: {
         )}
         {!props.hitBottom && (
           <ChatAction
+            key="to-bottom"
             onClick={props.scrollToBottom}
             text={Locale.Chat.InputActions.ToBottom}
             icon={<BottomIcon />}
@@ -624,6 +626,7 @@ export function ChatActions(props: {
         )}
         {props.hitBottom && (
           <ChatAction
+            key="settings"
             onClick={props.showPromptModal}
             text={Locale.Chat.InputActions.Settings}
             icon={<SettingsIcon />}
@@ -632,12 +635,14 @@ export function ChatActions(props: {
 
         {showUploadImage && (
           <ChatAction
+            key="upload-image"
             onClick={props.uploadImage}
             text={Locale.Chat.InputActions.UploadImage}
             icon={props.uploading ? <LoadingButtonIcon /> : <ImageIcon />}
           />
         )}
         <ChatAction
+          key="theme"
           onClick={nextTheme}
           text={Locale.Chat.InputActions.Theme[theme]}
           icon={
@@ -654,12 +659,14 @@ export function ChatActions(props: {
         />
 
         <ChatAction
+          key="prompt"
           onClick={props.showPromptHints}
           text={Locale.Chat.InputActions.Prompt}
           icon={<PromptIcon />}
         />
 
         <ChatAction
+          key="masks"
           onClick={() => {
             navigate(Path.Masks);
           }}
@@ -668,6 +675,7 @@ export function ChatActions(props: {
         />
 
         <ChatAction
+          key="clear"
           text={Locale.Chat.InputActions.Clear}
           icon={<BreakIcon />}
           onClick={async () => {
@@ -687,6 +695,7 @@ export function ChatActions(props: {
         />
 
         <ChatAction
+          key="model"
           onClick={() => props.setShowModelSelector(true)}
           text={currentModelName}
           icon={<RobotIcon />}
@@ -1739,7 +1748,7 @@ function _Chat() {
 
   return (
     <>
-      <div className={styles.chat} key={session.id}>
+      <div className={styles.chat}>
         <div className="window-header" data-tauri-drag-region>
           {isMobileScreen && (
             <div className="window-actions">
