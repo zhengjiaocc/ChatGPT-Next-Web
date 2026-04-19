@@ -286,21 +286,6 @@ export function Home() {
     initMcp();
   }, []);
 
-  if (!useHasHydrated()) {
-    return (
-      <div className={styles.container}>
-        <div className={styles["sidebar-skeleton"]}>
-          <div className={styles["skeleton-header"]} />
-          <div className={styles["skeleton-bar"]} />
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className={styles["skeleton-chat-item"]} />
-          ))}
-        </div>
-        <div className={styles["window-content"]} />
-      </div>
-    );
-  }
-
   return (
     <ErrorBoundary>
       <Router>

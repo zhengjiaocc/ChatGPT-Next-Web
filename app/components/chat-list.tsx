@@ -144,7 +144,11 @@ export function ChatList(props: { narrow?: boolean }) {
               <ChatItem
                 title={item.topic}
                 time={new Date(item.lastUpdate).toLocaleString()}
-                count={item.messages.length}
+                count={
+                  item.messagesLoaded
+                    ? item.messages.length
+                    : item.messageCount ?? 0
+                }
                 key={item.id}
                 id={item.id}
                 index={i}

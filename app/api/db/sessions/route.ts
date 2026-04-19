@@ -10,7 +10,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const sessions = await sql`
-    SELECT id, title, model, messages, mask, memory_prompt, last_summarize_index, updated_at, created_at FROM chat_sessions
+    SELECT id, title, model, mask, memory_prompt, last_summarize_index, updated_at,
+      jsonb_array_length(messages) AS message_count
+    FROM chat_sessions
     WHERE user_id = ${user.id} ORDER BY updated_at DESC
   `;
   return NextResponse.json(sessions);

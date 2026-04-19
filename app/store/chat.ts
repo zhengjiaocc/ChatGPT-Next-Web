@@ -98,6 +98,8 @@ export interface ChatSession {
   clearContextIndex?: number;
 
   mask: Mask;
+  messagesLoaded?: boolean;
+  messageCount?: number;
 }
 
 export const DEFAULT_TOPIC = Locale.Store.DefaultTopic;
@@ -234,6 +236,7 @@ function isLoggedIn() {
 
 async function syncSessionToDB(session: ChatSession, retries = 3) {
   if (!isLoggedIn()) return;
+  if (session.messagesLoaded === false) return;
   if (session.messages.length === 0 && session.topic === DEFAULT_TOPIC) return;
   // Filter out streaming messages before sync
   const messages = session.messages.filter((m) => !m.streaming);
@@ -295,6 +298,7 @@ export const useChatStore = createPersistStore(
         const newSession = createEmptySession();
 
         newSession.topic = currentSession.topic;
+        newSession.messagesLoaded = true;
         // 深拷贝消息
         newSession.messages = currentSession.messages.map((msg) => ({
           ...msg,
@@ -353,6 +357,7 @@ export const useChatStore = createPersistStore(
 
       newSession(mask?: Mask) {
         const session = createEmptySession();
+        session.messagesLoaded = true;
         const config = useAppConfig.getState();
         const globalModelConfig = config.modelConfig;
 
@@ -483,6 +488,10 @@ export const useChatStore = createPersistStore(
         isMcpResponse?: boolean,
       ) {
         const session = get().currentSession();
+        if (session.messagesLoaded === false) {
+          showToast("消息加载中，请稍候...");
+          return;
+        }
         const modelConfig = session.mask.modelConfig;
 
         // MCP Response no need to fill template
@@ -512,6 +521,11 @@ export const useChatStore = createPersistStore(
           model: modelConfig.model,
         });
 
+        // get recent messages before writing to session to avoid sending userMessage twice
+        const recentMessages = await get().getMessagesWithMemory();
+        const sendMessages = recentMessages.concat(userMessage);
+        const messageIndex = session.messages.length + 2;
+
         // save user's and bot's message immediately so UI shows them
         get().updateTargetSession(session, (session) => {
           session.messages = session.messages.concat([
@@ -519,11 +533,6 @@ export const useChatStore = createPersistStore(
             botMessage,
           ]);
         });
-
-        // get recent messages
-        const recentMessages = await get().getMessagesWithMemory();
-        const sendMessages = recentMessages.concat(userMessage);
-        const messageIndex = session.messages.length + 1;
 
         const matchedProvider = useProviderStore
           .getState()
@@ -547,9 +556,13 @@ export const useChatStore = createPersistStore(
             if (message) {
               botMessage.content = message;
             }
-            get().updateTargetSession(session, (session) => {
-              session.messages = session.messages.concat();
-            });
+            get().updateTargetSession(
+              session,
+              (session) => {
+                session.messages = session.messages.concat();
+              },
+              true,
+            );
           },
           async onFinish(message) {
             botMessage.streaming = false;
@@ -573,9 +586,13 @@ export const useChatStore = createPersistStore(
           },
           onBeforeTool(tool: ChatMessageTool) {
             (botMessage.tools = botMessage?.tools || []).push(tool);
-            get().updateTargetSession(session, (session) => {
-              session.messages = session.messages.concat();
-            });
+            get().updateTargetSession(
+              session,
+              (session) => {
+                session.messages = session.messages.concat();
+              },
+              true,
+            );
           },
           onAfterTool(tool: ChatMessageTool) {
             botMessage?.tools?.forEach((t, i, tools) => {
@@ -583,9 +600,13 @@ export const useChatStore = createPersistStore(
                 tools[i] = { ...tool };
               }
             });
-            get().updateTargetSession(session, (session) => {
-              session.messages = session.messages.concat();
-            });
+            get().updateTargetSession(
+              session,
+              (session) => {
+                session.messages = session.messages.concat();
+              },
+              true,
+            );
           },
           onError(error) {
             const isAborted = error.message?.includes?.("aborted");
@@ -875,8 +896,6 @@ export const useChatStore = createPersistStore(
           toBeSummarizedMsgs.unshift(memoryPrompt);
         }
 
-        const lastSummarizeIndex = session.messages.length;
-
         console.log(
           "[Chat History] ",
           toBeSummarizedMsgs,
@@ -913,8 +932,8 @@ export const useChatStore = createPersistStore(
               if (responseRes?.status === 200) {
                 console.log("[Memory] ", message);
                 get().updateTargetSession(session, (session) => {
-                  session.lastSummarizeIndex = lastSummarizeIndex;
-                  session.memoryPrompt = message; // Update the memory prompt for stored it in local storage
+                  session.lastSummarizeIndex = session.messages.length;
+                  session.memoryPrompt = message;
                 });
               }
             },
@@ -934,13 +953,14 @@ export const useChatStore = createPersistStore(
       updateTargetSession(
         targetSession: ChatSession,
         updater: (session: ChatSession) => void,
+        skipSync = false,
       ) {
         const sessions = get().sessions;
         const index = sessions.findIndex((s) => s.id === targetSession.id);
         if (index < 0) return;
         updater(sessions[index]);
         set(() => ({ sessions }));
-        syncSessionToDB(sessions[index]);
+        if (!skipSync) syncSessionToDB(sessions[index]);
       },
       async clearAllData() {
         await indexedDBStorage.clear();
@@ -963,20 +983,25 @@ export const useChatStore = createPersistStore(
           return;
         }
         const filteredRows = rows.filter(
-          (r: any) => r.messages?.length > 0 || r.title !== DEFAULT_TOPIC,
+          (r: any) => (r.message_count ?? 0) > 0 || r.title !== DEFAULT_TOPIC,
         );
         // Clean up empty sessions from DB
         rows
           .filter((r: any) => !filteredRows.includes(r))
           .forEach((r: any) => deleteSessionFromDB(r.id));
-        if (!filteredRows.length) return;
+        if (!filteredRows.length) {
+          set({ dbLoaded: true });
+          return;
+        }
         const providers = useProviderStore.getState().providers;
         const sessions: ChatSession[] = filteredRows.map((r: any) => {
           const session = {
             ...createEmptySession(),
             id: r.id,
             topic: r.title,
-            messages: r.messages ?? [],
+            messages: [],
+            messagesLoaded: false as const,
+            messageCount: r.message_count ?? 0,
             mask: r.mask ?? createEmptyMask(),
             memoryPrompt: r.memory_prompt ?? "",
             lastSummarizeIndex: r.last_summarize_index ?? 0,
@@ -1011,6 +1036,25 @@ export const useChatStore = createPersistStore(
       setLastInput(lastInput: string) {
         set({
           lastInput,
+        });
+      },
+
+      async loadSessionMessages(sessionId: string) {
+        const index = get().sessions.findIndex((s) => s.id === sessionId);
+        if (index < 0 || get().sessions[index].messagesLoaded) return;
+        const res = await fetch(`/api/db/sessions/${sessionId}`);
+        if (!res.ok) return;
+        const row = await res.json();
+        set((state) => {
+          const idx = state.sessions.findIndex((s) => s.id === sessionId);
+          if (idx < 0) return state;
+          const updated = [...state.sessions];
+          updated[idx] = {
+            ...updated[idx],
+            messages: row.messages ?? [],
+            messagesLoaded: true,
+          };
+          return { sessions: updated };
         });
       },
 
