@@ -505,6 +505,8 @@ export function ChatActions(props: {
   setShowShortcutKeyModal: React.Dispatch<React.SetStateAction<boolean>>;
   setUserInput: (input: string) => void;
   setShowChatSidePanel: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowModelSelector: React.Dispatch<React.SetStateAction<boolean>>;
+  showModelSelector: boolean;
 }) {
   const config = useAppConfig();
   const navigate = useNavigate();
@@ -555,7 +557,6 @@ export function ChatActions(props: {
     );
     return model?.displayName ?? "";
   }, [models, currentModel, currentProviderName]);
-  const [showModelSelector, setShowModelSelector] = useState(false);
   const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(
     new Set(),
   );
@@ -685,12 +686,12 @@ export function ChatActions(props: {
         />
 
         <ChatAction
-          onClick={() => setShowModelSelector(true)}
+          onClick={() => props.setShowModelSelector(true)}
           text={currentModelName}
           icon={<RobotIcon />}
         />
 
-        {showModelSelector && (
+        {props.showModelSelector && (
           <ModelSelector
             groups={(() => {
               const groups = new Map<string, typeof models>();
@@ -714,7 +715,7 @@ export function ChatActions(props: {
                 ? `${currentModel}@${currentProviderName}|${session.mask.modelConfig.providerId}`
                 : `${currentModel}@${currentProviderName}`
             }
-            onClose={() => setShowModelSelector(false)}
+            onClose={() => props.setShowModelSelector(false)}
             onSelect={(s) => {
               const [withoutId, providerId] = s.split("|");
               const [model, providerName] = getModelProvider(withoutId);
@@ -970,6 +971,14 @@ export function ShortcutKeyModal(props: { onClose: () => void }) {
         ? ["⌘", "Shift", "backspace"]
         : ["Ctrl", "Shift", "backspace"],
     },
+    {
+      title: "切换字体大小",
+      keys: isMac ? ["⌘", "Z"] : ["Ctrl", "Z"],
+    },
+    {
+      title: "选择模型",
+      keys: isMac ? ["⌘", "M"] : ["Ctrl", "M"],
+    },
   ];
   return (
     <div className="modal-mask">
@@ -1022,6 +1031,7 @@ function _Chat() {
   const fontFamily = config.fontFamily;
 
   const [showExport, setShowExport] = useState(false);
+  const [showModelSelector, setShowModelSelector] = useState(false);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [userInput, setUserInput] = useState("");
@@ -1694,6 +1704,23 @@ function _Chat() {
           }
         });
       }
+      // 缩放 ctrl + z
+      else if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "z" &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+        config.update((c) => (c.tightBorder = !c.tightBorder));
+      }
+      // 选择模型 ctrl + m
+      else if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "m"
+      ) {
+        event.preventDefault();
+        setShowModelSelector((v) => !v);
+      }
     };
 
     document.addEventListener("keydown", handleKeyDown);
@@ -1701,7 +1728,7 @@ function _Chat() {
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [messages, chatStore, navigate, session]);
+  }, [messages, chatStore, navigate, session, config]);
 
   const [showChatSidePanel, setShowChatSidePanel] = useState(false);
 
@@ -2093,6 +2120,8 @@ function _Chat() {
                 setShowShortcutKeyModal={setShowShortcutKeyModal}
                 setUserInput={setUserInput}
                 setShowChatSidePanel={setShowChatSidePanel}
+                setShowModelSelector={setShowModelSelector}
+                showModelSelector={showModelSelector}
               />
               <label
                 className={clsx(styles["chat-input-panel-inner"], {
