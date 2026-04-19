@@ -954,11 +954,20 @@ export const useChatStore = createPersistStore(
         location.reload();
       },
       async loadFromDB() {
-        if (!isLoggedIn()) return;
+        if (!isLoggedIn()) {
+          set({ dbLoaded: true });
+          return;
+        }
         const res = await fetch("/api/db/sessions");
-        if (!res.ok) return;
+        if (!res.ok) {
+          set({ dbLoaded: true });
+          return;
+        }
         const rows = await res.json();
-        if (!Array.isArray(rows) || rows.length === 0) return;
+        if (!Array.isArray(rows) || rows.length === 0) {
+          set({ dbLoaded: true });
+          return;
+        }
         const filteredRows = rows.filter(
           (r: any) => r.messages?.length > 0 || r.title !== DEFAULT_TOPIC,
         );

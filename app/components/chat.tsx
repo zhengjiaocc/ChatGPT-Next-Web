@@ -550,13 +550,14 @@ export function ChatActions(props: {
     }
   }, [allModels]);
   const currentModelName = useMemo(() => {
+    if (!chatStore.dbLoaded) return "";
     const model = models.find(
       (m) =>
         m.name == currentModel &&
         m?.provider?.providerName == currentProviderName,
     );
     return model?.displayName ?? "";
-  }, [models, currentModel, currentProviderName]);
+  }, [models, currentModel, currentProviderName, chatStore.dbLoaded]);
   const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(
     new Set(),
   );
