@@ -1159,6 +1159,30 @@ export function Settings() {
         </List>
 
         <DangerItems />
+
+        <List>
+          <ListItem>
+            <div className={styles["settings-license"]}>
+              <div className={styles["settings-license-title"]}>
+                开源声明 / Open Source Licenses
+              </div>
+              <div className={styles["settings-license-content"]}>
+                本项目基于 NextChat 进行二次开发
+                <br />
+                Original Project: NextChat · Copyright (c) 2023 Yidadaa · MIT
+                License
+                <br />
+                <a
+                  href="https://github.com/ChatGPTNextWeb/ChatGPT-Next-Web"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  https://github.com/ChatGPTNextWeb/ChatGPT-Next-Web
+                </a>
+              </div>
+            </div>
+          </ListItem>
+        </List>
       </div>
     </ErrorBoundary>
   );

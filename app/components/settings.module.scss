@@ -78,3 +78,33 @@
     overflow:visible ;
   }
 }
+
+.settings-license {
+  width: 100%;
+  padding: 0;
+
+  .settings-license-title {
+    font-size: 12px;
+    font-weight: normal;
+    margin-bottom: 8px;
+    color: var(--black);
+    opacity: 0.6;
+  }
+
+  .settings-license-content {
+    font-size: 11px;
+    line-height: 1.8;
+    color: var(--black);
+    opacity: 0.5;
+
+    a {
+      color: inherit;
+      text-decoration: none;
+      word-break: break-all;
+
+      &:hover {
+        opacity: 0.8;
+      }
+    }
+  }
+}
