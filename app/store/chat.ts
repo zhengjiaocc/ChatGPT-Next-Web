@@ -558,7 +558,10 @@ export const useChatStore = createPersistStore(
             const now = Date.now();
             if (now - lastSyncTime > 5000) {
               lastSyncTime = now;
-              syncSessionToDB(session);
+              const currentSession = get().sessions.find(
+                (s) => s.id === session.id,
+              );
+              if (currentSession) syncSessionToDB(currentSession);
             }
           },
           async onFinish(message) {
