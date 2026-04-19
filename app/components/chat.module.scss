@@ -675,6 +675,10 @@
   .chat-input-send {
     bottom: 30px;
   }
+
+  .shortcut-key-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .shortcut-key-container {
