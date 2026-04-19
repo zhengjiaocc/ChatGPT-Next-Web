@@ -56,7 +56,7 @@ export function ModelConfigList(props: {
           text={currentModelName}
           onClick={() => setShowModelSelector(true)}
         />
-        {showModelSelector && (
+        {showModelSelector ? (
           <ModelSelector
             groups={groups}
             currentValue={value}
@@ -72,7 +72,7 @@ export function ModelConfigList(props: {
               setShowModelSelector(false);
             }}
           />
-        )}
+        ) : null}
       </ListItem>
       <ListItem
         title={Locale.Settings.Temperature.Title}
@@ -275,7 +275,7 @@ export function ModelConfigList(props: {
           text={currentCompressName}
           onClick={() => setShowCompressSelector(true)}
         />
-        {showCompressSelector && (
+        {showCompressSelector ? (
           <ModelSelector
             groups={groups}
             currentValue={compressValue}
@@ -291,7 +291,7 @@ export function ModelConfigList(props: {
               setShowCompressSelector(false);
             }}
           />
-        )}
+        ) : null}
       </ListItem>
     </>
   );
