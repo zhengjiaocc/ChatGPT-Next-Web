@@ -979,6 +979,10 @@ export function ShortcutKeyModal(props: { onClose: () => void }) {
       title: "选择模型",
       keys: isMac ? ["⌘", "M"] : ["Ctrl", "M"],
     },
+    {
+      title: "展开/收起侧边栏",
+      keys: isMac ? ["⌘", "B"] : ["Ctrl", "B"],
+    },
   ];
   return (
     <div className="modal-mask">
