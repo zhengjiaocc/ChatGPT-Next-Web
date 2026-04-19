@@ -932,6 +932,10 @@ export const useChatStore = createPersistStore(
         const filteredRows = rows.filter(
           (r: any) => r.messages?.length > 0 || r.title !== DEFAULT_TOPIC,
         );
+        // Clean up empty sessions from DB
+        rows
+          .filter((r: any) => !filteredRows.includes(r))
+          .forEach((r: any) => deleteSessionFromDB(r.id));
         if (!filteredRows.length) return;
         const providers = useProviderStore.getState().providers;
         const sessions: ChatSession[] = filteredRows.map((r: any) => {

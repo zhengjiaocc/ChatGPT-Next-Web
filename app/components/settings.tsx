@@ -49,8 +49,7 @@ import Locale, {
   changeLang,
   getLang,
 } from "../locales";
-import { copyToClipboard, clientUpdate, semverCompare } from "../utils";
-import Link from "next/link";
+import { copyToClipboard, semverCompare } from "../utils";
 import {
   OPENAI_BASE_URL,
   Path,
@@ -668,6 +667,13 @@ export function Settings() {
   }, []);
 
   useEffect(() => {
+    return () => {
+      config.syncToDB();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     const keydownEvent = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         navigate(Path.Home);
@@ -740,6 +746,7 @@ export function Settings() {
                 <AvatarPicker
                   onEmojiClick={(avatar: string) => {
                     updateConfig((config) => (config.avatar = avatar));
+                    config.syncToDB();
                     setShowEmojiPicker(false);
                   }}
                 />
@@ -766,7 +773,9 @@ export function Settings() {
               value={config.avatar?.startsWith("http") ? config.avatar : ""}
               onChange={(e) => {
                 const val = e.currentTarget.value.trim();
-                updateConfig((config) => (config.avatar = val || config.avatar));
+                updateConfig(
+                  (config) => (config.avatar = val || config.avatar),
+                );
               }}
             />
           </ListItem>
