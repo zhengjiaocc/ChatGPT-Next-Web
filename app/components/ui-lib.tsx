@@ -118,6 +118,7 @@ interface ModalProps {
   defaultMax?: boolean;
   footer?: React.ReactNode;
   onClose?: () => void;
+  className?: string;
 }
 export function Modal(props: ModalProps) {
   useEffect(() => {
@@ -139,9 +140,13 @@ export function Modal(props: ModalProps) {
 
   return (
     <div
-      className={clsx(styles["modal-container"], {
-        [styles["modal-container-max"]]: isMax,
-      })}
+      className={clsx(
+        styles["modal-container"],
+        {
+          [styles["modal-container-max"]]: isMax,
+        },
+        props.className,
+      )}
     >
       <div className={styles["modal-header"]}>
         <div className={styles["modal-title"]}>{props.title}</div>
@@ -336,6 +341,7 @@ export function showConfirm(content: any) {
     root.render(
       <Modal
         title={Locale.UI.Confirm}
+        className={styles["modal-container-sm"]}
         actions={[
           <IconButton
             key="cancel"

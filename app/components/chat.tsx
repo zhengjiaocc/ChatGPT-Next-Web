@@ -668,9 +668,13 @@ export function ChatActions(props: {
         <ChatAction
           text={Locale.Chat.InputActions.Clear}
           icon={<BreakIcon />}
-          onClick={() => {
+          onClick={async () => {
+            const isSet = session.clearContextIndex === session.messages.length;
+            if (!isSet && !(await showConfirm(Locale.Memory.ResetConfirm))) {
+              return;
+            }
             chatStore.updateTargetSession(session, (session) => {
-              if (session.clearContextIndex === session.messages.length) {
+              if (isSet) {
                 session.clearContextIndex = undefined;
               } else {
                 session.clearContextIndex = session.messages.length;

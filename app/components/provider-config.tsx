@@ -283,13 +283,17 @@ export function ProviderConfig() {
           <List>
             {tabProviders.map((p) => (
               <div key={p.id}>
-                <div className={styles["provider-row"]}>
+                <div
+                  className={`${styles["provider-row"]}${
+                    p.models.length > 0 ? ` ${styles["clickable"]}` : ""
+                  }`}
+                  onClick={() =>
+                    p.models.length > 0 &&
+                    setExpanded(expanded === p.id ? null : p.id)
+                  }
+                >
                   <div
                     className={styles["expand-icon"]}
-                    onClick={() =>
-                      p.models.length > 0 &&
-                      setExpanded(expanded === p.id ? null : p.id)
-                    }
                     data-hidden={p.models.length === 0 ? "true" : undefined}
                   >
                     <LeftIcon
@@ -311,7 +315,10 @@ export function ProviderConfig() {
                           : "暂无模型"
                       }
                     >
-                      <div className={styles["action-row"]}>
+                      <div
+                        className={styles["action-row"]}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <label className={styles["toggle"]}>
                           <input
                             type="checkbox"

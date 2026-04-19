@@ -154,10 +154,7 @@ export function ChatList(props: { narrow?: boolean }) {
                   selectSession(i);
                 }}
                 onDelete={async () => {
-                  if (
-                    (!props.narrow && !isMobileScreen) ||
-                    (await showConfirm(Locale.Home.DeleteChat))
-                  ) {
+                  if (await showConfirm(Locale.Home.DeleteChat)) {
                     chatStore.deleteSession(i);
                   }
                 }}

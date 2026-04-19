@@ -233,6 +233,7 @@ function isLoggedIn() {
 
 async function syncSessionToDB(session: ChatSession) {
   if (!isLoggedIn()) return;
+  if (session.messages.length === 0 && session.topic === DEFAULT_TOPIC) return;
   await fetch("/api/db/sessions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -928,8 +929,12 @@ export const useChatStore = createPersistStore(
         if (!res.ok) return;
         const rows = await res.json();
         if (!Array.isArray(rows) || rows.length === 0) return;
+        const filteredRows = rows.filter(
+          (r: any) => r.messages?.length > 0 || r.title !== DEFAULT_TOPIC,
+        );
+        if (!filteredRows.length) return;
         const providers = useProviderStore.getState().providers;
-        const sessions: ChatSession[] = rows.map((r: any) => {
+        const sessions: ChatSession[] = filteredRows.map((r: any) => {
           const session = {
             ...createEmptySession(),
             id: r.id,
