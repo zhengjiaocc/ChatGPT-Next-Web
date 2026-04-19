@@ -6,7 +6,7 @@ import {
   ChatMessageTool,
   usePluginStore,
 } from "@/app/store";
-import { stream } from "@/app/utils/chat";
+import { streamWithThink } from "@/app/utils/chat";
 import { getMessageTextContent } from "@/app/utils";
 import { ChatOptions, LLMApi, LLMModel, LLMUsage, SpeechOptions } from "../api";
 import { RequestPayload } from "./openai";
@@ -96,7 +96,7 @@ export class ProviderStoreApi implements LLMApi {
           .getAsTools(
             useChatStore.getState().currentSession().mask?.plugin || [],
           );
-        return stream(
+        return streamWithThink(
           chatPath,
           requestPayload,
           headers,
@@ -106,7 +106,11 @@ export class ProviderStoreApi implements LLMApi {
           (text: string, runTools: ChatMessageTool[]) => {
             const json = JSON.parse(text);
             const choices = json.choices as Array<{
-              delta: { content: string; tool_calls: ChatMessageTool[] };
+              delta: {
+                content: string;
+                reasoning_content: string | null;
+                tool_calls: ChatMessageTool[];
+              };
             }>;
             const tool_calls = choices[0]?.delta?.tool_calls;
             if (tool_calls?.length > 0) {
@@ -127,7 +131,10 @@ export class ProviderStoreApi implements LLMApi {
                 runTools[index]["function"]["arguments"] += args;
               }
             }
-            return choices[0]?.delta?.content;
+            const reasoning = choices[0]?.delta?.reasoning_content;
+            const content = choices[0]?.delta?.content;
+            if (reasoning) return { isThinking: true, content: reasoning };
+            return { isThinking: false, content: content ?? "" };
           },
           (
             requestPayload: RequestPayload,
