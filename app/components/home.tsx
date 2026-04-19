@@ -184,7 +184,11 @@ function Screen() {
 
   useEffect(() => {
     if (isLogin || isAuth || getClientConfig()?.isApp) return;
-    if (!userStore.loggedIn && !accessStore.isAuthorized() && !accessStore.accessCode.trim()) {
+    if (
+      !userStore.loggedIn &&
+      !accessStore.isAuthorized() &&
+      !accessStore.accessCode.trim()
+    ) {
       navigate(Path.Login);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -283,7 +287,18 @@ export function Home() {
   }, []);
 
   if (!useHasHydrated()) {
-    return null;
+    return (
+      <div className={styles.container}>
+        <div className={styles["sidebar-skeleton"]}>
+          <div className={styles["skeleton-header"]} />
+          <div className={styles["skeleton-bar"]} />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className={styles["skeleton-chat-item"]} />
+          ))}
+        </div>
+        <div className={styles["window-content"]} />
+      </div>
+    );
   }
 
   return (

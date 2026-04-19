@@ -232,24 +232,31 @@ function isLoggedIn() {
   return useUserStore.getState().loggedIn;
 }
 
-async function syncSessionToDB(session: ChatSession) {
+async function syncSessionToDB(session: ChatSession, retries = 3) {
   if (!isLoggedIn()) return;
   if (session.messages.length === 0 && session.topic === DEFAULT_TOPIC) return;
   // Skip sync while any message is still streaming
   if (session.messages.some((m) => m.streaming)) return;
-  await fetch("/api/db/sessions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      id: session.id,
-      title: session.topic,
-      messages: session.messages,
-      model: session.mask.modelConfig.model,
-      mask: session.mask,
-      memoryPrompt: session.memoryPrompt,
-      lastSummarizeIndex: session.lastSummarizeIndex,
-    }),
-  });
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch("/api/db/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: session.id,
+          title: session.topic,
+          messages: session.messages,
+          model: session.mask.modelConfig.model,
+          mask: session.mask,
+          memoryPrompt: session.memoryPrompt,
+          lastSummarizeIndex: session.lastSummarizeIndex,
+        }),
+      });
+      if (res.ok) return;
+    } catch (e) {
+      if (i === retries - 1) console.error("[Sync] failed to sync session", e);
+    }
+  }
 }
 
 async function deleteSessionFromDB(id: string) {
@@ -551,8 +558,15 @@ export const useChatStore = createPersistStore(
             if (message) {
               botMessage.content = message;
               botMessage.date = new Date().toLocaleString();
-              get().onNewMessage(botMessage, session);
             }
+            get().updateTargetSession(session, (session) => {
+              session.messages = session.messages.map((m) =>
+                m.id === botMessage.id ? { ...botMessage } : m,
+              );
+              session.lastUpdate = Date.now();
+            });
+            if (message) get().updateStat(botMessage, session);
+            get().checkMcpJson(botMessage);
             ChatControllerPool.remove(session.id, botMessage.id);
           },
           onBeforeTool(tool: ChatMessageTool) {
@@ -988,10 +1002,12 @@ export const useChatStore = createPersistStore(
           if (local && local.lastUpdate > dbSession.lastUpdate) return local;
           return dbSession;
         });
-        // Add local-only sessions (not yet synced to DB)
+        // Add local-only sessions updated within last 30 days (not yet synced to DB)
+        const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
         localSessions.forEach((s) => {
           if (
             !merged.find((m) => m.id === s.id) &&
+            s.lastUpdate > thirtyDaysAgo &&
             (s.messages.length > 0 || s.topic !== DEFAULT_TOPIC)
           ) {
             merged.unshift(s);

@@ -62,6 +62,7 @@ export function useHotKey() {
                 ? DEFAULT_SIDEBAR_WIDTH
                 : NARROW_SIDEBAR_WIDTH;
           });
+          config.syncToDB();
         }
       }
     };
@@ -87,6 +88,7 @@ export function useDragSideBar() {
         config.sidebarWidth = NARROW_SIDEBAR_WIDTH;
       }
     });
+    config.syncToDB();
   };
 
   const onDragStart = (e: MouseEvent) => {
@@ -120,6 +122,8 @@ export function useDragSideBar() {
       const shouldFireClick = Date.now() - dragStartTime < 300;
       if (shouldFireClick) {
         toggleSideBar();
+      } else {
+        config.syncToDB();
       }
     };
 

@@ -36,7 +36,7 @@ export function ChatItem(props: {
   useEffect(() => {
     if (props.selected && draggableRef.current) {
       draggableRef.current?.scrollIntoView({
-        block: "center",
+        block: "nearest",
       });
     }
   }, [props.selected]);
