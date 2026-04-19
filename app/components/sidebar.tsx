@@ -48,6 +48,7 @@ const ChatList = dynamic(async () => (await import("./chat-list")).ChatList, {
 
 export function useHotKey() {
   const chatStore = useChatStore();
+  const config = useAppConfig();
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -56,6 +57,14 @@ export function useHotKey() {
           chatStore.nextSession(-1);
         } else if (e.key === "ArrowDown") {
           chatStore.nextSession(1);
+        } else if (e.key === "b" || e.key === "B") {
+          e.preventDefault();
+          config.update((c) => {
+            c.sidebarWidth =
+              c.sidebarWidth < MIN_SIDEBAR_WIDTH
+                ? DEFAULT_SIDEBAR_WIDTH
+                : NARROW_SIDEBAR_WIDTH;
+          });
         }
       }
     };
