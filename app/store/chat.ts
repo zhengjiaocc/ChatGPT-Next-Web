@@ -543,7 +543,6 @@ export const useChatStore = createPersistStore(
           ? { llm: new ProviderStoreApi(matchedProvider) }
           : getClientApi(modelConfig.providerName);
         // make request
-        let lastSyncTime = 0;
         api.llm.chat({
           messages: sendMessages,
           config: { ...modelConfig, stream: true },
@@ -555,14 +554,6 @@ export const useChatStore = createPersistStore(
             get().updateTargetSession(session, (session) => {
               session.messages = session.messages.concat();
             });
-            const now = Date.now();
-            if (now - lastSyncTime > 5000) {
-              lastSyncTime = now;
-              const currentSession = get().sessions.find(
-                (s) => s.id === session.id,
-              );
-              if (currentSession) syncSessionToDB(currentSession);
-            }
           },
           async onFinish(message) {
             botMessage.streaming = false;
