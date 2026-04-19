@@ -970,7 +970,7 @@ export function Settings() {
         <SyncItems />
 
         <List>
-          <ListItem title="模型提供商" subTitle="管理 API Key 与可用模型">
+          <ListItem title="模型供应商" subTitle="管理 API Key 与可用模型">
             <IconButton
               icon={<ConfigIcon />}
               text={Locale.UI.Config}
@@ -981,7 +981,7 @@ export function Settings() {
         {showProviderModal && (
           <div className="modal-mask">
             <Modal
-              title="模型提供商"
+              title="模型供应商"
               defaultMax
               onClose={() => setShowProviderModal(false)}
             >

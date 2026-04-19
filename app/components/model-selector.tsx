@@ -95,7 +95,7 @@ export function ModelSelector(props: {
         {splitView ? (
           <div className={styles["split-body"]}>
             <div className={styles["left"]}>
-              <div className={styles["panel-title"]}>提供商</div>
+              <div className={styles["panel-title"]}>供应商</div>
               {props.groups.map((g) => (
                 <div
                   key={g.provider}
