@@ -1130,3 +1130,44 @@
 #dmermaid {
   display: none;
 }
+
+.markdown-body details {
+  margin: 8px 0;
+  border-radius: 8px;
+  background: var(--second);
+  overflow: hidden;
+
+  summary {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--black);
+    opacity: 0.6;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    -webkit-user-select: none;
+    user-select: none;
+
+    &::before {
+      content: "▶";
+      font-size: 10px;
+      transition: transform 0.2s;
+    }
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+
+  &[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  & > *:not(summary) {
+    padding: 0 12px 12px;
+    font-size: 13px;
+    opacity: 0.75;
+  }
+}
