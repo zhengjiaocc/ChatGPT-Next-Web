@@ -512,22 +512,18 @@ export const useChatStore = createPersistStore(
           model: modelConfig.model,
         });
 
+        // save user's and bot's message immediately so UI shows them
+        get().updateTargetSession(session, (session) => {
+          session.messages = session.messages.concat([
+            { ...userMessage, content: mContent },
+            botMessage,
+          ]);
+        });
+
         // get recent messages
         const recentMessages = await get().getMessagesWithMemory();
         const sendMessages = recentMessages.concat(userMessage);
         const messageIndex = session.messages.length + 1;
-
-        // save user's and bot's message
-        get().updateTargetSession(session, (session) => {
-          const savedUserMessage = {
-            ...userMessage,
-            content: mContent,
-          };
-          session.messages = session.messages.concat([
-            savedUserMessage,
-            botMessage,
-          ]);
-        });
 
         const matchedProvider = useProviderStore
           .getState()
