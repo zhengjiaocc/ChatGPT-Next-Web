@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
   messages JSONB DEFAULT '[]',
   model TEXT,
   mask JSONB DEFAULT '{}',
+  memory_prompt TEXT DEFAULT '',
+  last_summarize_index INTEGER DEFAULT 0,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

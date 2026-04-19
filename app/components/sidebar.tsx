@@ -8,6 +8,8 @@ import GithubIcon from "../icons/github.svg";
 import ChatGptIcon from "../icons/chatgpt.svg";
 import AddIcon from "../icons/add.svg";
 import DeleteIcon from "../icons/delete.svg";
+import DarkIcon from "../icons/dark.svg";
+import LightIcon from "../icons/light.svg";
 import MaskIcon from "../icons/mask.svg";
 import McpIcon from "../icons/mcp.svg";
 import DragIcon from "../icons/drag.svg";
@@ -16,6 +18,7 @@ import DiscoveryIcon from "../icons/discovery.svg";
 import Locale from "../locales";
 
 import { useAppConfig, useChatStore } from "../store";
+import { Theme } from "../store/config";
 
 import {
   DEFAULT_SIDEBAR_WIDTH,
@@ -325,6 +328,20 @@ export function SideBar(props: { className?: string }) {
                     chatStore.deleteSession(chatStore.currentSessionIndex);
                   }
                 }}
+              />
+            </div>
+            <div className={styles["sidebar-action"]}>
+              <IconButton
+                aria="切换主题"
+                icon={
+                  config.theme === Theme.Dark ? <LightIcon /> : <DarkIcon />
+                }
+                shadow
+                onClick={() =>
+                  config.update((c) => {
+                    c.theme = c.theme === Theme.Dark ? Theme.Light : Theme.Dark;
+                  })
+                }
               />
             </div>
             <div className={styles["sidebar-action"]}>

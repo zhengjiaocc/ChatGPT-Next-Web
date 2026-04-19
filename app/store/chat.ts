@@ -246,6 +246,8 @@ async function syncSessionToDB(session: ChatSession) {
       messages: session.messages,
       model: session.mask.modelConfig.model,
       mask: session.mask,
+      memoryPrompt: session.memoryPrompt,
+      lastSummarizeIndex: session.lastSummarizeIndex,
     }),
   });
 }
@@ -951,6 +953,8 @@ export const useChatStore = createPersistStore(
             topic: r.title,
             messages: r.messages ?? [],
             mask: r.mask ?? createEmptyMask(),
+            memoryPrompt: r.memory_prompt ?? "",
+            lastSummarizeIndex: r.last_summarize_index ?? 0,
             lastUpdate: new Date(r.updated_at).getTime(),
           };
           // Auto-fill providerId if missing
@@ -977,7 +981,23 @@ export const useChatStore = createPersistStore(
           }
           return session;
         });
-        set({ sessions, currentSessionIndex: 0 });
+        // Merge: keep local session if it's newer than DB version
+        const localSessions = _get().sessions;
+        const merged = sessions.map((dbSession) => {
+          const local = localSessions.find((s) => s.id === dbSession.id);
+          if (local && local.lastUpdate > dbSession.lastUpdate) return local;
+          return dbSession;
+        });
+        // Add local-only sessions (not yet synced to DB)
+        localSessions.forEach((s) => {
+          if (
+            !merged.find((m) => m.id === s.id) &&
+            (s.messages.length > 0 || s.topic !== DEFAULT_TOPIC)
+          ) {
+            merged.unshift(s);
+          }
+        });
+        set({ sessions: merged, currentSessionIndex: 0 });
       },
       setLastInput(lastInput: string) {
         set({

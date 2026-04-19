@@ -226,11 +226,73 @@ function UserPromptModal(props: { onClose?: () => void }) {
   );
 }
 
+function ChangePwdModal({ onClose }: { onClose: () => void }) {
+  const [oldPwd, setOldPwd] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  const [pwdError, setPwdError] = useState("");
+
+  const submit = async () => {
+    if (newPwd !== confirmPwd) {
+      setPwdError("两次密码不一致");
+      return;
+    }
+    if (newPwd.length < 6) {
+      setPwdError("新密码至少6位");
+      return;
+    }
+    const res = await fetch("/api/auth/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ oldPassword: oldPwd, newPassword: newPwd }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setPwdError(data.error ?? "修改失败");
+    } else {
+      showToast("密码修改成功");
+      onClose();
+    }
+  };
+
+  return (
+    <div className="modal-mask">
+      <Modal title="修改密码" onClose={onClose}>
+        <List>
+          <ListItem title="原密码">
+            <PasswordInput
+              value={oldPwd}
+              onChange={(e) => setOldPwd(e.currentTarget.value)}
+            />
+          </ListItem>
+          <ListItem title="新密码">
+            <PasswordInput
+              value={newPwd}
+              onChange={(e) => setNewPwd(e.currentTarget.value)}
+            />
+          </ListItem>
+          <ListItem title="确认新密码">
+            <PasswordInput
+              value={confirmPwd}
+              onChange={(e) => setConfirmPwd(e.currentTarget.value)}
+            />
+          </ListItem>
+          {pwdError && <ListItem title={pwdError} />}
+          <ListItem>
+            <IconButton text="确认修改" onClick={submit} type="primary" />
+          </ListItem>
+        </List>
+      </Modal>
+    </div>
+  );
+}
+
 function DangerItems() {
   const chatStore = useChatStore();
   const appConfig = useAppConfig();
   const navigate = useNavigate();
   const userStore = useUserStore();
+  const [showChangePwd, setShowChangePwd] = useState(false);
 
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -239,43 +301,60 @@ function DangerItems() {
   };
 
   return (
-    <List>
-      {userStore.loggedIn && (
-        <ListItem title="退出登录" subTitle={`当前用户：${userStore.username}`}>
-          <IconButton text="退出" onClick={logout} type="danger" />
-        </ListItem>
+    <>
+      {showChangePwd && (
+        <ChangePwdModal onClose={() => setShowChangePwd(false)} />
       )}
-      <ListItem
-        title={Locale.Settings.Danger.Reset.Title}
-        subTitle={Locale.Settings.Danger.Reset.SubTitle}
-      >
-        <IconButton
-          aria={Locale.Settings.Danger.Reset.Title}
-          text={Locale.Settings.Danger.Reset.Action}
-          onClick={async () => {
-            if (await showConfirm(Locale.Settings.Danger.Reset.Confirm)) {
-              appConfig.reset();
-            }
-          }}
-          type="danger"
-        />
-      </ListItem>
-      <ListItem
-        title={Locale.Settings.Danger.Clear.Title}
-        subTitle={Locale.Settings.Danger.Clear.SubTitle}
-      >
-        <IconButton
-          aria={Locale.Settings.Danger.Clear.Title}
-          text={Locale.Settings.Danger.Clear.Action}
-          onClick={async () => {
-            if (await showConfirm(Locale.Settings.Danger.Clear.Confirm)) {
-              chatStore.clearAllData();
-            }
-          }}
-          type="danger"
-        />
-      </ListItem>
-    </List>
+      <List>
+        {userStore.loggedIn && (
+          <>
+            <ListItem
+              title="退出登录"
+              subTitle={`当前用户：${userStore.username}`}
+            >
+              <IconButton text="退出" onClick={logout} type="danger" />
+            </ListItem>
+            <ListItem title="修改密码">
+              <IconButton
+                icon={<EditIcon />}
+                text="修改"
+                onClick={() => setShowChangePwd(true)}
+              />
+            </ListItem>
+          </>
+        )}
+        <ListItem
+          title={Locale.Settings.Danger.Reset.Title}
+          subTitle={Locale.Settings.Danger.Reset.SubTitle}
+        >
+          <IconButton
+            aria={Locale.Settings.Danger.Reset.Title}
+            text={Locale.Settings.Danger.Reset.Action}
+            onClick={async () => {
+              if (await showConfirm(Locale.Settings.Danger.Reset.Confirm)) {
+                appConfig.reset();
+              }
+            }}
+            type="danger"
+          />
+        </ListItem>
+        <ListItem
+          title={Locale.Settings.Danger.Clear.Title}
+          subTitle={Locale.Settings.Danger.Clear.SubTitle}
+        >
+          <IconButton
+            aria={Locale.Settings.Danger.Clear.Title}
+            text={Locale.Settings.Danger.Clear.Action}
+            onClick={async () => {
+              if (await showConfirm(Locale.Settings.Danger.Clear.Confirm)) {
+                chatStore.clearAllData();
+              }
+            }}
+            type="danger"
+          />
+        </ListItem>
+      </List>
+    </>
   );
 }
 
