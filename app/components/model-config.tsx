@@ -27,6 +27,7 @@ export function ModelConfigList(props: {
     }
     return Array.from(map.entries()).map(([provider, ms]) => ({
       provider,
+      providerType: ms[0]?.provider?.providerType,
       models: ms.map((m) => ({
         name: m.name,
         displayName: m.displayName,

@@ -6,6 +6,7 @@ import styles from "./model-selector.module.scss";
 
 interface ProviderGroup {
   provider: string;
+  providerType?: string;
   models: Array<{ name: string; displayName?: string; providerId?: string }>;
 }
 
@@ -107,7 +108,11 @@ export function ModelSelector(props: {
                   }}
                 >
                   <Avatar
-                    model={PROVIDER_ICON_MODEL[g.provider] ?? g.provider}
+                    model={
+                      PROVIDER_ICON_MODEL[g.providerType ?? g.provider] ??
+                      g.providerType ??
+                      g.provider
+                    }
                     iconType="provider"
                   />
                   <div className={styles["provider-info"]}>
@@ -166,7 +171,11 @@ export function ModelSelector(props: {
                       }
                     />
                     <Avatar
-                      model={PROVIDER_ICON_MODEL[g.provider] ?? g.provider}
+                      model={
+                        PROVIDER_ICON_MODEL[g.providerType ?? g.provider] ??
+                        g.providerType ??
+                        g.provider
+                      }
                       iconType="provider"
                     />
                     <span className={styles["provider-name"]}>

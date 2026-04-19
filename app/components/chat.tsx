@@ -697,6 +697,7 @@ export function ChatActions(props: {
               }
               return Array.from(groups.entries()).map(([provider, ms]) => ({
                 provider,
+                providerType: ms[0]?.provider?.providerType,
                 models: ms.map((m) => ({
                   name: m.name,
                   displayName: m.displayName,
