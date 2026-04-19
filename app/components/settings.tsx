@@ -290,71 +290,40 @@ function ChangePwdModal({ onClose }: { onClose: () => void }) {
 function DangerItems() {
   const chatStore = useChatStore();
   const appConfig = useAppConfig();
-  const navigate = useNavigate();
-  const userStore = useUserStore();
-  const [showChangePwd, setShowChangePwd] = useState(false);
-
-  const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    userStore.logout();
-    navigate(Path.Login);
-  };
 
   return (
-    <>
-      {showChangePwd && (
-        <ChangePwdModal onClose={() => setShowChangePwd(false)} />
-      )}
-      <List>
-        {userStore.loggedIn && (
-          <>
-            <ListItem
-              title="退出登录"
-              subTitle={`当前用户：${userStore.username}`}
-            >
-              <IconButton text="退出" onClick={logout} type="danger" />
-            </ListItem>
-            <ListItem title="修改密码">
-              <IconButton
-                icon={<EditIcon />}
-                text="修改"
-                onClick={() => setShowChangePwd(true)}
-              />
-            </ListItem>
-          </>
-        )}
-        <ListItem
-          title={Locale.Settings.Danger.Reset.Title}
-          subTitle={Locale.Settings.Danger.Reset.SubTitle}
-        >
-          <IconButton
-            aria={Locale.Settings.Danger.Reset.Title}
-            text={Locale.Settings.Danger.Reset.Action}
-            onClick={async () => {
-              if (await showConfirm(Locale.Settings.Danger.Reset.Confirm)) {
-                appConfig.reset();
-              }
-            }}
-            type="danger"
-          />
-        </ListItem>
-        <ListItem
-          title={Locale.Settings.Danger.Clear.Title}
-          subTitle={Locale.Settings.Danger.Clear.SubTitle}
-        >
-          <IconButton
-            aria={Locale.Settings.Danger.Clear.Title}
-            text={Locale.Settings.Danger.Clear.Action}
-            onClick={async () => {
-              if (await showConfirm(Locale.Settings.Danger.Clear.Confirm)) {
-                chatStore.clearAllData();
-              }
-            }}
-            type="danger"
-          />
-        </ListItem>
-      </List>
-    </>
+    <List>
+      <ListItem
+        title={Locale.Settings.Danger.Reset.Title}
+        subTitle={Locale.Settings.Danger.Reset.SubTitle}
+      >
+        <IconButton
+          aria={Locale.Settings.Danger.Reset.Title}
+          text={Locale.Settings.Danger.Reset.Action}
+          onClick={async () => {
+            if (await showConfirm(Locale.Settings.Danger.Reset.Confirm)) {
+              appConfig.reset();
+            }
+          }}
+          type="danger"
+        />
+      </ListItem>
+      <ListItem
+        title={Locale.Settings.Danger.Clear.Title}
+        subTitle={Locale.Settings.Danger.Clear.SubTitle}
+      >
+        <IconButton
+          aria={Locale.Settings.Danger.Clear.Title}
+          text={Locale.Settings.Danger.Clear.Action}
+          onClick={async () => {
+            if (await showConfirm(Locale.Settings.Danger.Clear.Confirm)) {
+              chatStore.clearAllData();
+            }
+          }}
+          type="danger"
+        />
+      </ListItem>
+    </List>
   );
 }
 
@@ -725,17 +694,13 @@ export function Settings() {
     });
   }
 
-  const enabledAccessControl = useMemo(
-    () => accessStore.enabledAccessControl(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
   const promptStore = usePromptStore();
   const builtinCount = SearchService.count.builtin;
   const customCount = promptStore.getUserPrompts().length ?? 0;
   const [shouldShowPromptModal, setShowPromptModal] = useState(false);
   const [showProviderModal, setShowProviderModal] = useState(false);
+  const [showChangePwd, setShowChangePwd] = useState(false);
+  const userStore = useUserStore();
 
   const showUsage = accessStore.isAuthorized();
   useEffect(() => {
@@ -772,25 +737,6 @@ export function Settings() {
   }, []);
 
   const clientConfig = useMemo(() => getClientConfig(), []);
-  const showAccessCode = enabledAccessControl && !clientConfig?.isApp;
-
-  const accessCodeComponent = showAccessCode && (
-    <ListItem
-      title={Locale.Settings.Access.AccessCode.Title}
-      subTitle={Locale.Settings.Access.AccessCode.SubTitle}
-    >
-      <PasswordInput
-        value={accessStore.accessCode}
-        type="text"
-        placeholder={Locale.Settings.Access.AccessCode.Placeholder}
-        onChange={(e) => {
-          accessStore.update(
-            (access) => (access.accessCode = e.currentTarget.value),
-          );
-        }}
-      />
-    </ListItem>
-  );
 
   return (
     <ErrorBoundary>
@@ -817,6 +763,10 @@ export function Settings() {
         </div>
       </div>
       <div className={styles["settings"]}>
+        {showChangePwd && (
+          <ChangePwdModal onClose={() => setShowChangePwd(false)} />
+        )}
+        {/* 账户 */}
         <List>
           <ListItem title={Locale.Settings.Avatar}>
             <Popover
@@ -859,6 +809,35 @@ export function Settings() {
             />
           </ListItem>
 
+          {userStore.loggedIn && (
+            <>
+              <ListItem
+                title="退出登录"
+                subTitle={`当前用户：${userStore.username}`}
+              >
+                <IconButton
+                  text="退出"
+                  onClick={async () => {
+                    await fetch("/api/auth/logout", { method: "POST" });
+                    userStore.logout();
+                    navigate(Path.Login);
+                  }}
+                  type="danger"
+                />
+              </ListItem>
+              <ListItem title="修改密码">
+                <IconButton
+                  icon={<EditIcon />}
+                  text="修改"
+                  onClick={() => setShowChangePwd(true)}
+                />
+              </ListItem>
+            </>
+          )}
+        </List>
+
+        {/* 通用 */}
+        <List>
           <ListItem
             title={Locale.Settings.Update.Version(currentVersion ?? "unknown")}
           />
@@ -986,39 +965,6 @@ export function Settings() {
               }
             ></input>
           </ListItem>
-
-          <ListItem
-            title={Locale.Mask.Config.Artifacts.Title}
-            subTitle={Locale.Mask.Config.Artifacts.SubTitle}
-          >
-            <input
-              aria-label={Locale.Mask.Config.Artifacts.Title}
-              type="checkbox"
-              checked={config.enableArtifacts}
-              onChange={(e) =>
-                updateConfig(
-                  (config) =>
-                    (config.enableArtifacts = e.currentTarget.checked),
-                )
-              }
-            ></input>
-          </ListItem>
-          <ListItem
-            title={Locale.Mask.Config.CodeFold.Title}
-            subTitle={Locale.Mask.Config.CodeFold.SubTitle}
-          >
-            <input
-              aria-label={Locale.Mask.Config.CodeFold.Title}
-              type="checkbox"
-              checked={config.enableCodeFold}
-              data-testid="enable-code-fold-checkbox"
-              onChange={(e) =>
-                updateConfig(
-                  (config) => (config.enableCodeFold = e.currentTarget.checked),
-                )
-              }
-            ></input>
-          </ListItem>
         </List>
 
         <SyncItems />
@@ -1044,6 +990,7 @@ export function Settings() {
           </div>
         )}
 
+        {/* 面具 & 提示词 */}
         <List>
           <ListItem
             title={Locale.Settings.Mask.Splash.Title}
@@ -1079,9 +1026,7 @@ export function Settings() {
               }
             ></input>
           </ListItem>
-        </List>
 
-        <List>
           <ListItem
             title={Locale.Settings.Prompt.Disable.Title}
             subTitle={Locale.Settings.Prompt.Disable.SubTitle}
@@ -1113,11 +1058,44 @@ export function Settings() {
               onClick={() => setShowPromptModal(true)}
             />
           </ListItem>
+
+          <ListItem
+            title={Locale.Mask.Config.Artifacts.Title}
+            subTitle={Locale.Mask.Config.Artifacts.SubTitle}
+          >
+            <input
+              aria-label={Locale.Mask.Config.Artifacts.Title}
+              type="checkbox"
+              checked={config.enableArtifacts}
+              onChange={(e) =>
+                updateConfig(
+                  (config) =>
+                    (config.enableArtifacts = e.currentTarget.checked),
+                )
+              }
+            ></input>
+          </ListItem>
+
+          <ListItem
+            title={Locale.Mask.Config.CodeFold.Title}
+            subTitle={Locale.Mask.Config.CodeFold.SubTitle}
+          >
+            <input
+              aria-label={Locale.Mask.Config.CodeFold.Title}
+              type="checkbox"
+              checked={config.enableCodeFold}
+              data-testid="enable-code-fold-checkbox"
+              onChange={(e) =>
+                updateConfig(
+                  (config) => (config.enableCodeFold = e.currentTarget.checked),
+                )
+              }
+            ></input>
+          </ListItem>
         </List>
 
+        {/* 模型配置 */}
         <List id={SlotID.CustomModel}>
-          {accessCodeComponent}
-
           {!shouldHideBalanceQuery && !clientConfig?.isApp ? (
             <ListItem
               title={Locale.Settings.Usage.Title}
@@ -1143,9 +1121,7 @@ export function Settings() {
               )}
             </ListItem>
           ) : null}
-        </List>
 
-        <List>
           <ModelConfigList
             modelConfig={config.modelConfig}
             updateConfig={(updater) => {
