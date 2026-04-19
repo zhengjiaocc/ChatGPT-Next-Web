@@ -1125,7 +1125,7 @@ export const useChatStore = createPersistStore(
       return newState as any;
     },
     partialize: (state) => {
-      const { sessions, ...rest } = state as any;
+      const { sessions, dbLoaded, ...rest } = state as any;
       return rest;
     },
   },
