@@ -760,7 +760,9 @@ export const useChatStore = createPersistStore(
                 : p.type.toLowerCase() === (providerName ?? "").toLowerCase()),
           );
         const api: ClientApi = summarizeProvider
-          ? ({ llm: new ProviderStoreApi(summarizeProvider) } as ClientApi)
+          ? ({
+              llm: new ProviderStoreApi(summarizeProvider),
+            } as unknown as ClientApi)
           : getClientApi(providerName as ServiceProvider);
 
         // remove error messages if any
