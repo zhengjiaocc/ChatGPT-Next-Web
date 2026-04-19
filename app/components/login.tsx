@@ -6,6 +6,7 @@ import { IconButton } from "./button";
 import BotIcon from "../icons/bot.svg";
 import EyeIcon from "../icons/eye.svg";
 import EyeOffIcon from "../icons/eye-off.svg";
+import LoadingIcon from "../icons/three-dots.svg";
 import { useUserStore } from "../store/user";
 import { useChatStore } from "../store";
 import { useProviderStore } from "../store/provider";
@@ -176,8 +177,10 @@ export function LoginPage() {
 
         <div className={styles.btn}>
           <IconButton
+            icon={loading ? <LoadingIcon /> : undefined}
             text={loading ? "请稍候..." : mode === "login" ? "登录" : "注册"}
             type="primary"
+            disabled={loading}
             onClick={submit}
           />
         </div>
