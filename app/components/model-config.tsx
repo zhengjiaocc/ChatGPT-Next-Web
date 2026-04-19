@@ -56,24 +56,24 @@ export function ModelConfigList(props: {
           text={currentModelName}
           onClick={() => setShowModelSelector(true)}
         />
-        {showModelSelector ? (
-          <ModelSelector
-            groups={groups}
-            currentValue={value}
-            onClose={() => setShowModelSelector(false)}
-            onSelect={(s) => {
-              const [withoutId, providerId] = s.split("|");
-              const [model, providerName] = getModelProvider(withoutId);
-              props.updateConfig((config) => {
-                config.model = ModalConfigValidator.model(model);
-                config.providerName = providerName as ServiceProvider;
-                config.providerId = providerId ?? "";
-              });
-              setShowModelSelector(false);
-            }}
-          />
-        ) : null}
       </ListItem>
+      {showModelSelector && (
+        <ModelSelector
+          groups={groups}
+          currentValue={value}
+          onClose={() => setShowModelSelector(false)}
+          onSelect={(s) => {
+            const [withoutId, providerId] = s.split("|");
+            const [model, providerName] = getModelProvider(withoutId);
+            props.updateConfig((config) => {
+              config.model = ModalConfigValidator.model(model);
+              config.providerName = providerName as ServiceProvider;
+              config.providerId = providerId ?? "";
+            });
+            setShowModelSelector(false);
+          }}
+        />
+      )}
       <ListItem
         title={Locale.Settings.Temperature.Title}
         subTitle={Locale.Settings.Temperature.SubTitle}
@@ -275,24 +275,24 @@ export function ModelConfigList(props: {
           text={currentCompressName}
           onClick={() => setShowCompressSelector(true)}
         />
-        {showCompressSelector ? (
-          <ModelSelector
-            groups={groups}
-            currentValue={compressValue}
-            onClose={() => setShowCompressSelector(false)}
-            onSelect={(s) => {
-              const [withoutId, providerId] = s.split("|");
-              const [model, providerName] = getModelProvider(withoutId);
-              props.updateConfig((config) => {
-                config.compressModel = ModalConfigValidator.model(model);
-                config.compressProviderName = providerName as ServiceProvider;
-                config.compressProviderId = providerId ?? "";
-              });
-              setShowCompressSelector(false);
-            }}
-          />
-        ) : null}
       </ListItem>
+      {showCompressSelector && (
+        <ModelSelector
+          groups={groups}
+          currentValue={compressValue}
+          onClose={() => setShowCompressSelector(false)}
+          onSelect={(s) => {
+            const [withoutId, providerId] = s.split("|");
+            const [model, providerName] = getModelProvider(withoutId);
+            props.updateConfig((config) => {
+              config.compressModel = ModalConfigValidator.model(model);
+              config.compressProviderName = providerName as ServiceProvider;
+              config.compressProviderId = providerId ?? "";
+            });
+            setShowCompressSelector(false);
+          }}
+        />
+      )}
     </>
   );
 }
