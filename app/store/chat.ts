@@ -88,6 +88,7 @@ export interface ChatStat {
 export interface ChatSession {
   id: string;
   topic: string;
+  customTopic?: boolean;
 
   memoryPrompt: string;
   messages: ChatMessage[];
@@ -775,6 +776,7 @@ export const useChatStore = createPersistStore(
         const SUMMARIZE_MIN_LEN = 50;
         if (
           (config.enableAutoGenerateTitle &&
+            !session.customTopic &&
             session.topic === DEFAULT_TOPIC &&
             countMessages(messages) >= SUMMARIZE_MIN_LEN) ||
           refreshTitle
@@ -821,12 +823,11 @@ export const useChatStore = createPersistStore(
                     parsed?.title ??
                     message;
                 } catch {}
-                get().updateTargetSession(
-                  session,
-                  (session) =>
-                    (session.topic =
-                      topic.length > 0 ? trimTopic(topic) : DEFAULT_TOPIC),
-                );
+                get().updateTargetSession(session, (session) => {
+                  session.topic =
+                    topic.length > 0 ? trimTopic(topic) : DEFAULT_TOPIC;
+                  session.customTopic = false;
+                });
               }
             },
             onError() {

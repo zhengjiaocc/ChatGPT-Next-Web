@@ -916,10 +916,10 @@ export function EditMessageModal(props: { onClose: () => void }) {
               type="text"
               value={session.topic}
               onInput={(e) =>
-                chatStore.updateTargetSession(
-                  session,
-                  (session) => (session.topic = e.currentTarget.value),
-                )
+                chatStore.updateTargetSession(session, (session) => {
+                  session.topic = e.currentTarget.value;
+                  session.customTopic = true;
+                })
               }
             ></input>
           </ListItem>
@@ -1771,7 +1771,13 @@ function _Chat() {
                 icon={<ReloadIcon />}
                 bordered
                 title={Locale.Chat.Actions.RefreshTitle}
-                onClick={() => {
+                onClick={async () => {
+                  if (
+                    session.customTopic &&
+                    !(await showConfirm("将覆盖自定义标题，确认重新生成？"))
+                  ) {
+                    return;
+                  }
                   showToast(Locale.Chat.Actions.RefreshToast);
                   chatStore.summarizeSession(true, session);
                 }}
