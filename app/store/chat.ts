@@ -338,11 +338,10 @@ export const useChatStore = createPersistStore(
 
       newSession(mask?: Mask) {
         const session = createEmptySession();
+        const config = useAppConfig.getState();
+        const globalModelConfig = config.modelConfig;
 
         if (mask) {
-          const config = useAppConfig.getState();
-          const globalModelConfig = config.modelConfig;
-
           session.mask = {
             ...mask,
             modelConfig: {
@@ -351,6 +350,31 @@ export const useChatStore = createPersistStore(
             },
           };
           session.topic = mask.name;
+        } else {
+          session.mask.modelConfig = { ...globalModelConfig };
+        }
+
+        // Auto-fill providerId if missing
+        if (!session.mask.modelConfig.providerId) {
+          const { model, providerName } = session.mask.modelConfig;
+          const providers = useProviderStore.getState().providers;
+          const provider =
+            providers.find(
+              (p) =>
+                p.enabled &&
+                p.type.toLowerCase() === (providerName ?? "").toLowerCase() &&
+                (p.models.includes(model) || p.models.length === 0),
+            ) ?? providers.find((p) => p.enabled);
+          if (provider) {
+            session.mask.modelConfig.providerId = provider.id;
+            session.mask.modelConfig.providerName = provider.type as any;
+            if (
+              provider.models.length > 0 &&
+              !provider.models.includes(model)
+            ) {
+              session.mask.modelConfig.model = provider.models[0] as any;
+            }
+          }
         }
 
         set((state) => ({
@@ -495,8 +519,10 @@ export const useChatStore = createPersistStore(
           .providers.find(
             (p) =>
               p.enabled &&
-              p.type === modelConfig.providerName &&
-              p.models.includes(modelConfig.model),
+              (modelConfig.providerId
+                ? p.id === modelConfig.providerId
+                : p.type === modelConfig.providerName &&
+                  p.models.includes(modelConfig.model)),
           );
         const api = matchedProvider
           ? { llm: new ProviderStoreApi(matchedProvider) }
@@ -715,13 +741,27 @@ export const useChatStore = createPersistStore(
         }
 
         // if not config compressModel, then using getSummarizeModel
+        const compressProviderId = modelConfig.compressModel
+          ? modelConfig.compressProviderId
+          : modelConfig.providerId;
         const [model, providerName] = modelConfig.compressModel
           ? [modelConfig.compressModel, modelConfig.compressProviderName]
           : getSummarizeModel(
               session.mask.modelConfig.model,
               session.mask.modelConfig.providerName,
             );
-        const api: ClientApi = getClientApi(providerName as ServiceProvider);
+        const summarizeProvider = useProviderStore
+          .getState()
+          .providers.find(
+            (p) =>
+              p.enabled &&
+              (compressProviderId
+                ? p.id === compressProviderId
+                : p.type.toLowerCase() === (providerName ?? "").toLowerCase()),
+          );
+        const api: ClientApi = summarizeProvider
+          ? ({ llm: new ProviderStoreApi(summarizeProvider) } as ClientApi)
+          : getClientApi(providerName as ServiceProvider);
 
         // remove error messages if any
         const messages = session.messages;
@@ -755,14 +795,23 @@ export const useChatStore = createPersistStore(
               model,
               stream: false,
               providerName,
+              providerId: modelConfig.compressModel
+                ? modelConfig.compressProviderId
+                : modelConfig.providerId,
             },
             onFinish(message, responseRes) {
               if (responseRes?.status === 200) {
                 let topic = message;
                 // handle JSON response like {"cause":{"name":"..."}}
                 try {
-                  const parsed = JSON.parse(message.replace(/^```json\s*|```$/g, "").trim());
-                  topic = parsed?.cause?.name ?? parsed?.name ?? parsed?.title ?? message;
+                  const parsed = JSON.parse(
+                    message.replace(/^```json\s*|```$/g, "").trim(),
+                  );
+                  topic =
+                    parsed?.cause?.name ??
+                    parsed?.name ??
+                    parsed?.title ??
+                    message;
                 } catch {}
                 get().updateTargetSession(
                   session,
@@ -877,14 +926,40 @@ export const useChatStore = createPersistStore(
         if (!res.ok) return;
         const rows = await res.json();
         if (!Array.isArray(rows) || rows.length === 0) return;
-        const sessions: ChatSession[] = rows.map((r: any) => ({
-          ...createEmptySession(),
-          id: r.id,
-          topic: r.title,
-          messages: r.messages ?? [],
-          mask: r.mask ?? createEmptyMask(),
-          lastUpdate: new Date(r.updated_at).getTime(),
-        }));
+        const providers = useProviderStore.getState().providers;
+        const sessions: ChatSession[] = rows.map((r: any) => {
+          const session = {
+            ...createEmptySession(),
+            id: r.id,
+            topic: r.title,
+            messages: r.messages ?? [],
+            mask: r.mask ?? createEmptyMask(),
+            lastUpdate: new Date(r.updated_at).getTime(),
+          };
+          // Auto-fill providerId if missing
+          if (!session.mask.modelConfig.providerId) {
+            const { model, providerName } = session.mask.modelConfig;
+            const provider =
+              providers.find(
+                (p) =>
+                  p.enabled &&
+                  p.type.toLowerCase() === (providerName ?? "").toLowerCase() &&
+                  p.models.includes(model),
+              ) ??
+              providers.find(
+                (p) =>
+                  p.enabled &&
+                  p.type.toLowerCase() === (providerName ?? "").toLowerCase(),
+              ) ??
+              providers.find((p) => p.enabled);
+            if (provider) {
+              session.mask.modelConfig.providerId = provider.id;
+              if (provider.type !== providerName)
+                session.mask.modelConfig.providerName = provider.type as any;
+            }
+          }
+          return session;
+        });
         set({ sessions, currentSessionIndex: 0 });
       },
       setLastInput(lastInput: string) {

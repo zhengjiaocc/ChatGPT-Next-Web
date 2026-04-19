@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useAccessStore, useAppConfig } from "../store";
 import { useProviderStore } from "../store/provider";
+import { LLMModel } from "../client/api";
 import { collectModelsWithDefaultModel } from "./model";
 
 export function useAllModels() {
@@ -9,21 +10,36 @@ export function useAllModels() {
   const providerStore = useProviderStore();
 
   const models = useMemo(() => {
-    const providerModels = providerStore.providers
-      .filter((p) => p.enabled && p.models.length > 0)
-      .flatMap((p) => p.models.map((m) => `+${m}@${p.type}`))
-      .join(",");
+    const enabledProviders = providerStore.providers.filter(
+      (p) => p.enabled && p.models.length > 0,
+    );
 
-    // If provider store has models, only show those; otherwise fall back to defaults
-    const hasProviderModels = providerModels.length > 0;
-    const baseModels = hasProviderModels ? [] : configStore.models;
-    const customModels = hasProviderModels
-      ? providerModels
-      : [configStore.customModels, accessStore.customModels].join(",");
+    if (enabledProviders.length > 0) {
+      // Build LLMModel[] directly, preserving instance id as provider.id
+      const providerModels: LLMModel[] = enabledProviders.flatMap((p) =>
+        p.models.map((m, i) => ({
+          name: m,
+          displayName: m,
+          available: true,
+          sorted: i,
+          provider: {
+            id: p.id, // instance id — used to look up apiKey directly
+            providerName: p.label || p.type,
+            providerType: p.type,
+            sorted: 0,
+          },
+        })),
+      );
+      return collectModelsWithDefaultModel(
+        providerModels,
+        accessStore.defaultModel ? `=${accessStore.defaultModel}` : "",
+        accessStore.defaultModel,
+      );
+    }
 
     return collectModelsWithDefaultModel(
-      baseModels,
-      customModels,
+      configStore.models,
+      [configStore.customModels, accessStore.customModels].join(","),
       accessStore.defaultModel,
     );
   }, [

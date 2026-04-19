@@ -7,7 +7,7 @@ import BotIcon from "../icons/bot.svg";
 import EyeIcon from "../icons/eye.svg";
 import EyeOffIcon from "../icons/eye-off.svg";
 import { useUserStore } from "../store/user";
-import { useChatStore, useAccessStore } from "../store";
+import { useChatStore } from "../store";
 import { useProviderStore } from "../store/provider";
 import { useAppConfig } from "../store/config";
 import { getClientApi } from "../client/api";
@@ -27,18 +27,35 @@ export function LoginPage() {
   const [turnstileToken, setTurnstileToken] = useState("");
 
   const submit = async () => {
-    if (!username.trim() || !password.trim()) { setError("用户名和密码不能为空"); return; }
-    if (TURNSTILE_SITE_KEY && !turnstileToken) { setError("请完成人机验证"); return; }
-    setLoading(true); setError("");
-    const res = await fetch(mode === "login" ? "/api/auth/login" : "/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password, turnstileToken }),
-    });
+    if (!username.trim() || !password.trim()) {
+      setError("用户名和密码不能为空");
+      return;
+    }
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+      setError("请完成人机验证");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    const res = await fetch(
+      mode === "login" ? "/api/auth/login" : "/api/auth/register",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, turnstileToken }),
+      },
+    );
     const data = await res.json();
     setLoading(false);
-    if (!res.ok) { setError(data.error ?? "操作失败"); return; }
-    if (mode === "register") { setMode("login"); setError("注册成功，请登录"); return; }
+    if (!res.ok) {
+      setError(data.error ?? "操作失败");
+      return;
+    }
+    if (mode === "register") {
+      setMode("login");
+      setError("注册成功，请登录");
+      return;
+    }
     userStore.login(data.id, data.username);
     // 登录后初始化：加载 DB 数据
     await Promise.all([
@@ -54,15 +71,47 @@ export function LoginPage() {
         fetch("/api/provider-models", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: p.type, apiKey: p.apiKey, baseUrl: p.baseUrl }),
+          body: JSON.stringify({
+            type: p.type,
+            apiKey: p.apiKey,
+            baseUrl: p.baseUrl,
+          }),
         })
           .then((r) => r.json())
           .then((d) => {
-            if (d.models?.length) useProviderStore.getState().setModels(p.id, d.models);
+            if (d.models?.length)
+              useProviderStore.getState().setModels(p.id, d.models);
           })
           .catch(() => {});
       });
     const config = useAppConfig.getState();
+    // Fill providerId for global modelConfig based on providerName
+    const { model, providerName } = config.modelConfig;
+    const matchedProvider =
+      providers.find(
+        (p) =>
+          p.enabled &&
+          p.type.toLowerCase() === (providerName ?? "").toLowerCase() &&
+          p.models.includes(model),
+      ) ??
+      providers.find(
+        (p) =>
+          p.enabled &&
+          p.type.toLowerCase() === (providerName ?? "").toLowerCase(),
+      ) ??
+      providers.find((p) => p.enabled);
+    if (matchedProvider && !config.modelConfig.providerId) {
+      config.update((c) => {
+        c.modelConfig.providerId = matchedProvider.id;
+        if (matchedProvider.type !== providerName)
+          c.modelConfig.providerName = matchedProvider.type as any;
+        if (
+          matchedProvider.models.length > 0 &&
+          !matchedProvider.models.includes(model)
+        )
+          c.modelConfig.model = matchedProvider.models[0] as any;
+      });
+    }
     const api = getClientApi(config.modelConfig.providerName);
     api.llm.models().then((models) => config.mergeModels(models));
     navigate(Path.Chat);
@@ -71,12 +120,17 @@ export function LoginPage() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <div className="no-dark" style={{ alignSelf: "center", transform: "scale(1.2)", marginBottom: 16 }}>
+        <div
+          className="no-dark"
+          style={{
+            alignSelf: "center",
+            transform: "scale(1.2)",
+            marginBottom: 16,
+          }}
+        >
           <BotIcon />
         </div>
-        <div className={styles.title}>
-          {mode === "login" ? "登录" : "注册"}
-        </div>
+        <div className={styles.title}>{mode === "login" ? "登录" : "注册"}</div>
 
         <input
           className={styles.input}
@@ -102,7 +156,11 @@ export function LoginPage() {
         </div>
 
         {error && (
-          <div className={error === "注册成功，请登录" ? styles.success : styles.error}>
+          <div
+            className={
+              error === "注册成功，请登录" ? styles.success : styles.error
+            }
+          >
             {error}
           </div>
         )}
@@ -112,15 +170,25 @@ export function LoginPage() {
             siteKey={TURNSTILE_SITE_KEY}
             onSuccess={setTurnstileToken}
             onExpire={() => setTurnstileToken("")}
-            style={{ marginBottom: 8 }}
+            style={{ marginBottom: 8, width: "100%" }}
           />
         )}
 
         <div className={styles.btn}>
-          <IconButton text={loading ? "请稍候..." : mode === "login" ? "登录" : "注册"} type="primary" onClick={submit} />
+          <IconButton
+            text={loading ? "请稍候..." : mode === "login" ? "登录" : "注册"}
+            type="primary"
+            onClick={submit}
+          />
         </div>
 
-        <span className={styles.switchMode} onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
+        <span
+          className={styles.switchMode}
+          onClick={() => {
+            setMode(mode === "login" ? "register" : "login");
+            setError("");
+          }}
+        >
           {mode === "login" ? "没有账号？注册" : "已有账号？登录"}
         </span>
       </div>

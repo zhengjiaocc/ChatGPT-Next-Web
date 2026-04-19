@@ -71,6 +71,7 @@ export const DEFAULT_CONFIG = {
   modelConfig: {
     model: "gpt-4o-mini" as ModelType,
     providerName: "OpenAI" as ServiceProvider,
+    providerId: "",
     temperature: 0.5,
     top_p: 1,
     max_tokens: 4000,
@@ -81,6 +82,7 @@ export const DEFAULT_CONFIG = {
     compressMessageLengthThreshold: 1000,
     compressModel: "",
     compressProviderName: "",
+    compressProviderId: "",
     enableInjectSystemPrompts: true,
     template: config?.template ?? DEFAULT_INPUT_TEMPLATE,
     size: "1024x1024" as ModelSize,

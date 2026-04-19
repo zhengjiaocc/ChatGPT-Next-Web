@@ -144,7 +144,7 @@ export class ErnieApi implements LLMApi {
         method: "POST",
         body: JSON.stringify(requestPayload),
         signal: controller.signal,
-        headers: getHeaders(),
+        headers: getHeaders(false, undefined, options.config),
       };
 
       // make a fetch request

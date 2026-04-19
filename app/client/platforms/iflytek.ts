@@ -104,7 +104,7 @@ export class SparkApi implements LLMApi {
         method: "POST",
         body: JSON.stringify(requestPayload),
         signal: controller.signal,
-        headers: getHeaders(),
+        headers: getHeaders(false, undefined, options.config),
       };
 
       // Make a fetch request

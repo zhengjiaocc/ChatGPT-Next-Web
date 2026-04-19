@@ -55,6 +55,8 @@ export interface RequestMessage {
 export interface LLMConfig {
   model: string;
   providerName?: string;
+  providerId?: string;
+  overrideApiKey?: string;
   temperature?: number;
   top_p?: number;
   stream?: boolean;
@@ -242,9 +244,14 @@ export function validString(x: string): boolean {
   return x?.length > 0;
 }
 
-export function getHeaders(ignoreHeaders: boolean = false, overrideApiKey?: string) {
+export function getHeaders(
+  ignoreHeaders: boolean = false,
+  overrideApiKey?: string,
+  config?: LLMConfig,
+) {
   const accessStore = useAccessStore.getState();
   const chatStore = useChatStore.getState();
+  const _overrideApiKey = overrideApiKey || config?.overrideApiKey;
   let headers: Record<string, string> = {};
   if (!ignoreHeaders) {
     headers = {
@@ -256,31 +263,36 @@ export function getHeaders(ignoreHeaders: boolean = false, overrideApiKey?: stri
   const clientConfig = getClientConfig();
 
   function getConfig() {
-    const modelConfig = chatStore.currentSession().mask.modelConfig;
+    const sessionModelConfig = chatStore.currentSession().mask.modelConfig;
+    // Use config param's providerName/model if available (e.g. for title generation)
+    const effectiveProviderName =
+      config?.providerName ?? sessionModelConfig.providerName;
+    const effectiveModel = config?.model ?? sessionModelConfig.model;
+    const effectiveProviderId =
+      config?.providerId ?? sessionModelConfig.providerId;
     const providerStore = useProviderStore.getState();
 
-    // Check if current model matches a provider store instance
-    const matchedProvider = providerStore.providers.find(
-      (p) =>
-        p.enabled &&
-        p.type === modelConfig.providerName &&
-        p.models.includes(modelConfig.model),
-    );
+    // Find provider by exact instance id only
+    const matchedProvider = effectiveProviderId
+      ? providerStore.providers.find(
+          (p) => p.enabled && p.id === effectiveProviderId,
+        )
+      : undefined;
 
-    const isGoogle = modelConfig.providerName === ServiceProvider.Google;
-    const isAzure = modelConfig.providerName === ServiceProvider.Azure;
-    const isAnthropic = modelConfig.providerName === ServiceProvider.Anthropic;
-    const isBaidu = modelConfig.providerName == ServiceProvider.Baidu;
-    const isByteDance = modelConfig.providerName === ServiceProvider.ByteDance;
-    const isAlibaba = modelConfig.providerName === ServiceProvider.Alibaba;
-    const isMoonshot = modelConfig.providerName === ServiceProvider.Moonshot;
-    const isIflytek = modelConfig.providerName === ServiceProvider.Iflytek;
-    const isDeepSeek = modelConfig.providerName === ServiceProvider.DeepSeek;
-    const isXAI = modelConfig.providerName === ServiceProvider.XAI;
-    const isChatGLM = modelConfig.providerName === ServiceProvider.ChatGLM;
-    const isSiliconFlow =
-      modelConfig.providerName === ServiceProvider.SiliconFlow;
-    const isAI302 = modelConfig.providerName === ServiceProvider["302.AI"];
+    const p = (effectiveProviderName ?? "").toLowerCase();
+    const isGoogle = p === "google";
+    const isAzure = p === "azure";
+    const isAnthropic = p === "anthropic";
+    const isBaidu = p === "baidu";
+    const isByteDance = p === "bytedance";
+    const isAlibaba = p === "alibaba";
+    const isMoonshot = p === "moonshot";
+    const isIflytek = p === "iflytek";
+    const isDeepSeek = p === "deepseek";
+    const isXAI = p === "xai";
+    const isChatGLM = p === "chatglm";
+    const isSiliconFlow = p === "siliconflow";
+    const isAI302 = p === "302.ai";
     const isEnabledAccessControl = accessStore.enabledAccessControl();
     const apiKey = isGoogle
       ? accessStore.googleApiKey
@@ -309,7 +321,7 @@ export function getHeaders(ignoreHeaders: boolean = false, overrideApiKey?: stri
       : isAI302
       ? accessStore.ai302ApiKey
       : accessStore.openaiApiKey;
-    const finalApiKey = overrideApiKey || matchedProvider?.apiKey || apiKey;
+    const finalApiKey = _overrideApiKey || matchedProvider?.apiKey || apiKey;
     return {
       isGoogle,
       isAzure,
@@ -378,34 +390,19 @@ export function getHeaders(ignoreHeaders: boolean = false, overrideApiKey?: stri
 }
 
 export function getClientApi(provider: ServiceProvider): ClientApi {
-  switch (provider) {
-    case ServiceProvider.Google:
-      return new ClientApi(ModelProvider.GeminiPro);
-    case ServiceProvider.Anthropic:
-      return new ClientApi(ModelProvider.Claude);
-    case ServiceProvider.Baidu:
-      return new ClientApi(ModelProvider.Ernie);
-    case ServiceProvider.ByteDance:
-      return new ClientApi(ModelProvider.Doubao);
-    case ServiceProvider.Alibaba:
-      return new ClientApi(ModelProvider.Qwen);
-    case ServiceProvider.Tencent:
-      return new ClientApi(ModelProvider.Hunyuan);
-    case ServiceProvider.Moonshot:
-      return new ClientApi(ModelProvider.Moonshot);
-    case ServiceProvider.Iflytek:
-      return new ClientApi(ModelProvider.Iflytek);
-    case ServiceProvider.DeepSeek:
-      return new ClientApi(ModelProvider.DeepSeek);
-    case ServiceProvider.XAI:
-      return new ClientApi(ModelProvider.XAI);
-    case ServiceProvider.ChatGLM:
-      return new ClientApi(ModelProvider.ChatGLM);
-    case ServiceProvider.SiliconFlow:
-      return new ClientApi(ModelProvider.SiliconFlow);
-    case ServiceProvider["302.AI"]:
-      return new ClientApi(ModelProvider["302.AI"]);
-    default:
-      return new ClientApi(ModelProvider.GPT);
-  }
+  const p = (provider ?? "").toLowerCase();
+  if (p === "google") return new ClientApi(ModelProvider.GeminiPro);
+  if (p === "anthropic") return new ClientApi(ModelProvider.Claude);
+  if (p === "baidu") return new ClientApi(ModelProvider.Ernie);
+  if (p === "bytedance") return new ClientApi(ModelProvider.Doubao);
+  if (p === "alibaba") return new ClientApi(ModelProvider.Qwen);
+  if (p === "tencent") return new ClientApi(ModelProvider.Hunyuan);
+  if (p === "moonshot") return new ClientApi(ModelProvider.Moonshot);
+  if (p === "iflytek") return new ClientApi(ModelProvider.Iflytek);
+  if (p === "deepseek") return new ClientApi(ModelProvider.DeepSeek);
+  if (p === "xai") return new ClientApi(ModelProvider.XAI);
+  if (p === "chatglm") return new ClientApi(ModelProvider.ChatGLM);
+  if (p === "siliconflow") return new ClientApi(ModelProvider.SiliconFlow);
+  if (p === "302.ai") return new ClientApi(ModelProvider["302.AI"]);
+  return new ClientApi(ModelProvider.GPT);
 }

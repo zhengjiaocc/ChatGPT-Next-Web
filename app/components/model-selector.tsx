@@ -6,7 +6,7 @@ import styles from "./model-selector.module.scss";
 
 interface ProviderGroup {
   provider: string;
-  models: Array<{ name: string; displayName?: string }>;
+  models: Array<{ name: string; displayName?: string; providerId?: string }>;
 }
 
 export function ModelSelector(props: {
@@ -17,7 +17,15 @@ export function ModelSelector(props: {
 }) {
   const [activeProvider, setActiveProvider] = useState(
     props.groups.find((g) =>
-      g.models.some((m) => `${m.name}@${g.provider}` === props.currentValue),
+      g.models.some((m) => {
+        const v = m.providerId
+          ? `${m.name}@${g.provider}|${m.providerId}`
+          : `${m.name}@${g.provider}`;
+        return (
+          v === props.currentValue ||
+          `${m.name}@${g.provider}` === props.currentValue
+        );
+      }),
     )?.provider ?? props.groups[0]?.provider,
   );
   const [splitView, setSplitView] = useState(true);
@@ -116,8 +124,12 @@ export function ModelSelector(props: {
                 {activeProvider ?? "模型"}
               </div>
               {filteredModels?.map((m) => {
-                const value = `${m.name}@${activeGroup?.provider}`;
-                const selected = value === props.currentValue;
+                const value = m.providerId
+                  ? `${m.name}@${activeGroup?.provider}|${m.providerId}`
+                  : `${m.name}@${activeGroup?.provider}`;
+                const selected =
+                  value === props.currentValue ||
+                  `${m.name}@${activeGroup?.provider}` === props.currentValue;
                 return (
                   <div
                     key={value}
@@ -166,8 +178,12 @@ export function ModelSelector(props: {
                   </div>
                   {expanded &&
                     g.models.map((m) => {
-                      const value = `${m.name}@${g.provider}`;
-                      const selected = value === props.currentValue;
+                      const value = m.providerId
+                        ? `${m.name}@${g.provider}|${m.providerId}`
+                        : `${m.name}@${g.provider}`;
+                      const selected =
+                        value === props.currentValue ||
+                        `${m.name}@${g.provider}` === props.currentValue;
                       return (
                         <div
                           key={value}

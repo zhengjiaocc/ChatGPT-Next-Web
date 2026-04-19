@@ -1,53 +1,78 @@
 import { ServiceProvider } from "@/app/constant";
 import { ModalConfigValidator, ModelConfig } from "../store";
-
+import { useState } from "react";
 import Locale from "../locales";
 import { InputRange } from "./input-range";
-import { ListItem, Select } from "./ui-lib";
+import { ListItem } from "./ui-lib";
 import { useAllModels } from "../utils/hooks";
-import { groupBy } from "lodash-es";
-import styles from "./model-config.module.scss";
 import { getModelProvider } from "../utils/model";
+import { ModelSelector } from "./model-selector";
+import { IconButton } from "./button";
 
 export function ModelConfigList(props: {
   modelConfig: ModelConfig;
   updateConfig: (updater: (config: ModelConfig) => void) => void;
 }) {
   const allModels = useAllModels();
-  const groupModels = groupBy(
-    allModels.filter((v) => v.available),
-    "provider.providerName",
-  );
+  const availableModels = allModels.filter((v) => v.available);
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [showCompressSelector, setShowCompressSelector] = useState(false);
+
+  const groups = (() => {
+    const map = new Map<string, typeof availableModels>();
+    for (const m of availableModels) {
+      const key = m?.provider?.providerName ?? "其他";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(m);
+    }
+    return Array.from(map.entries()).map(([provider, ms]) => ({
+      provider,
+      models: ms.map((m) => ({
+        name: m.name,
+        displayName: m.displayName,
+        providerId: m.provider?.id,
+      })),
+    }));
+  })();
+
   const value = `${props.modelConfig.model}@${props.modelConfig?.providerName}`;
-  const compressModelValue = `${props.modelConfig.compressModel}@${props.modelConfig?.compressProviderName}`;
+  const compressValue = `${props.modelConfig.compressModel}@${props.modelConfig?.compressProviderName}`;
+  const currentModelName =
+    availableModels.find(
+      (m) => `${m.name}@${m.provider?.providerName}` === value,
+    )?.displayName ?? props.modelConfig.model;
+  const currentCompressName =
+    availableModels.find(
+      (m) => `${m.name}@${m.provider?.providerName}` === compressValue,
+    )?.displayName ||
+    props.modelConfig.compressModel ||
+    Locale.Settings.CompressModel.Title;
 
   return (
     <>
       <ListItem title={Locale.Settings.Model}>
-        <Select
-          aria-label={Locale.Settings.Model}
-          value={value}
-          align="left"
-          onChange={(e) => {
-            const [model, providerName] = getModelProvider(
-              e.currentTarget.value,
-            );
-            props.updateConfig((config) => {
-              config.model = ModalConfigValidator.model(model);
-              config.providerName = providerName as ServiceProvider;
-            });
-          }}
-        >
-          {Object.keys(groupModels).map((providerName, index) => (
-            <optgroup label={providerName} key={index}>
-              {groupModels[providerName].map((v, i) => (
-                <option value={`${v.name}@${v.provider?.providerName}`} key={i}>
-                  {v.displayName}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </Select>
+        <IconButton
+          bordered
+          text={currentModelName}
+          onClick={() => setShowModelSelector(true)}
+        />
+        {showModelSelector && (
+          <ModelSelector
+            groups={groups}
+            currentValue={value}
+            onClose={() => setShowModelSelector(false)}
+            onSelect={(s) => {
+              const [withoutId, providerId] = s.split("|");
+              const [model, providerName] = getModelProvider(withoutId);
+              props.updateConfig((config) => {
+                config.model = ModalConfigValidator.model(model);
+                config.providerName = providerName as ServiceProvider;
+                config.providerId = providerId ?? "";
+              });
+              setShowModelSelector(false);
+            }}
+          />
+        )}
       </ListItem>
       <ListItem
         title={Locale.Settings.Temperature.Title}
@@ -245,28 +270,28 @@ export function ModelConfigList(props: {
         title={Locale.Settings.CompressModel.Title}
         subTitle={Locale.Settings.CompressModel.SubTitle}
       >
-        <Select
-          className={styles["select-compress-model"]}
-          aria-label={Locale.Settings.CompressModel.Title}
-          value={compressModelValue}
-          onChange={(e) => {
-            const [model, providerName] = getModelProvider(
-              e.currentTarget.value,
-            );
-            props.updateConfig((config) => {
-              config.compressModel = ModalConfigValidator.model(model);
-              config.compressProviderName = providerName as ServiceProvider;
-            });
-          }}
-        >
-          {allModels
-            .filter((v) => v.available)
-            .map((v, i) => (
-              <option value={`${v.name}@${v.provider?.providerName}`} key={i}>
-                {v.displayName}({v.provider?.providerName})
-              </option>
-            ))}
-        </Select>
+        <IconButton
+          bordered
+          text={currentCompressName}
+          onClick={() => setShowCompressSelector(true)}
+        />
+        {showCompressSelector && (
+          <ModelSelector
+            groups={groups}
+            currentValue={compressValue}
+            onClose={() => setShowCompressSelector(false)}
+            onSelect={(s) => {
+              const [withoutId, providerId] = s.split("|");
+              const [model, providerName] = getModelProvider(withoutId);
+              props.updateConfig((config) => {
+                config.compressModel = ModalConfigValidator.model(model);
+                config.compressProviderName = providerName as ServiceProvider;
+                config.compressProviderId = providerId ?? "";
+              });
+              setShowCompressSelector(false);
+            }}
+          />
+        )}
       </ListItem>
     </>
   );

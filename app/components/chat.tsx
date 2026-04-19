@@ -593,6 +593,7 @@ export function ChatActions(props: {
         session.mask.modelConfig.model = nextModel.name;
         session.mask.modelConfig.providerName = nextModel?.provider
           ?.providerName as ServiceProvider;
+        session.mask.modelConfig.providerId = nextModel?.provider?.id ?? "";
       });
       showToast(
         nextModel?.provider?.providerName == "ByteDance"
@@ -699,17 +700,24 @@ export function ChatActions(props: {
                 models: ms.map((m) => ({
                   name: m.name,
                   displayName: m.displayName,
+                  providerId: m.provider?.id,
                 })),
               }));
             })()}
-            currentValue={`${currentModel}@${currentProviderName}`}
+            currentValue={
+              session.mask.modelConfig.providerId
+                ? `${currentModel}@${currentProviderName}|${session.mask.modelConfig.providerId}`
+                : `${currentModel}@${currentProviderName}`
+            }
             onClose={() => setShowModelSelector(false)}
             onSelect={(s) => {
-              const [model, providerName] = getModelProvider(s);
+              const [withoutId, providerId] = s.split("|");
+              const [model, providerName] = getModelProvider(withoutId);
               chatStore.updateTargetSession(session, (session) => {
                 session.mask.modelConfig.model = model as ModelType;
                 session.mask.modelConfig.providerName =
                   providerName as ServiceProvider;
+                session.mask.modelConfig.providerId = providerId ?? "";
                 session.mask.syncGlobalConfig = false;
               });
               if (providerName == "ByteDance") {
