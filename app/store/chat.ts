@@ -886,9 +886,7 @@ export const useChatStore = createPersistStore(
 
         if (historyMsgLength > (modelConfig?.max_tokens || 4000)) {
           const n = toBeSummarizedMsgs.length;
-          toBeSummarizedMsgs = toBeSummarizedMsgs.slice(
-            Math.max(0, n - modelConfig.historyMessageCount),
-          );
+          toBeSummarizedMsgs = toBeSummarizedMsgs.slice(Math.max(0, n - 20));
         }
         const memoryPrompt = get().getMemoryPrompt();
         if (memoryPrompt) {
@@ -929,7 +927,7 @@ export const useChatStore = createPersistStore(
               session.memoryPrompt = message;
             },
             onFinish(message, responseRes) {
-              if (responseRes?.status === 200) {
+              if (message) {
                 console.log("[Memory] ", message);
                 get().updateTargetSession(session, (session) => {
                   session.lastSummarizeIndex = session.messages.length;
