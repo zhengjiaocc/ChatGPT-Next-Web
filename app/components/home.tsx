@@ -167,6 +167,7 @@ function Screen() {
   const navigate = useNavigate();
   const accessStore = useAccessStore();
   const userStore = useUserStore();
+  const chatStore = useChatStore();
   const isArtifact = location.pathname.includes(Path.Artifacts);
   const isHome = location.pathname === Path.Home;
   const isAuth = location.pathname === Path.Auth;
@@ -205,6 +206,7 @@ function Screen() {
     if (isAuth) return <AuthPage />;
     if (isSd) return <Sd />;
     if (isSdNew) return <Sd />;
+    const showSkeleton = userStore.loggedIn && !chatStore.dbLoaded;
     return (
       <>
         <SideBar
@@ -213,16 +215,18 @@ function Screen() {
           })}
         />
         <WindowContent>
-          <Routes>
-            <Route path={Path.Home} element={<Chat />} />
-            <Route path={Path.NewChat} element={<NewChat />} />
-            <Route path={Path.Masks} element={<MaskPage />} />
-            <Route path={Path.Plugins} element={<PluginPage />} />
-            <Route path={Path.SearchChat} element={<SearchChat />} />
-            <Route path={Path.Chat} element={<Chat />} />
-            <Route path={Path.Settings} element={<Settings />} />
-            <Route path={Path.McpMarket} element={<McpMarketPage />} />
-          </Routes>
+          {showSkeleton ? null : (
+            <Routes>
+              <Route path={Path.Home} element={<Chat />} />
+              <Route path={Path.NewChat} element={<NewChat />} />
+              <Route path={Path.Masks} element={<MaskPage />} />
+              <Route path={Path.Plugins} element={<PluginPage />} />
+              <Route path={Path.SearchChat} element={<SearchChat />} />
+              <Route path={Path.Chat} element={<Chat />} />
+              <Route path={Path.Settings} element={<Settings />} />
+              <Route path={Path.McpMarket} element={<McpMarketPage />} />
+            </Routes>
+          )}
         </WindowContent>
       </>
     );

@@ -273,6 +273,7 @@ const DEFAULT_CHAT_STATE = {
   sessions: [createEmptySession()],
   currentSessionIndex: 0,
   lastInput: "",
+  dbLoaded: false,
 };
 
 export const useChatStore = createPersistStore(
@@ -1002,7 +1003,7 @@ export const useChatStore = createPersistStore(
           }
           return session;
         });
-        set({ sessions, currentSessionIndex: 0 });
+        set({ sessions, currentSessionIndex: 0, dbLoaded: true });
       },
       setLastInput(lastInput: string) {
         set({
