@@ -235,8 +235,9 @@ function isLoggedIn() {
 async function syncSessionToDB(session: ChatSession, retries = 3) {
   if (!isLoggedIn()) return;
   if (session.messages.length === 0 && session.topic === DEFAULT_TOPIC) return;
-  // Skip sync while any message is still streaming
-  if (session.messages.some((m) => m.streaming)) return;
+  // Filter out streaming messages before sync
+  const messages = session.messages.filter((m) => !m.streaming);
+  if (messages.length === 0) return;
   for (let i = 0; i < retries; i++) {
     try {
       const res = await fetch("/api/db/sessions", {
@@ -245,7 +246,7 @@ async function syncSessionToDB(session: ChatSession, retries = 3) {
         body: JSON.stringify({
           id: session.id,
           title: session.topic,
-          messages: session.messages,
+          messages,
           model: session.mask.modelConfig.model,
           mask: session.mask,
           memoryPrompt: session.memoryPrompt,
@@ -995,25 +996,7 @@ export const useChatStore = createPersistStore(
           }
           return session;
         });
-        // Merge: keep local session if it's newer than DB version
-        const localSessions = _get().sessions;
-        const merged = sessions.map((dbSession) => {
-          const local = localSessions.find((s) => s.id === dbSession.id);
-          if (local && local.lastUpdate > dbSession.lastUpdate) return local;
-          return dbSession;
-        });
-        // Add local-only sessions updated within last 30 days (not yet synced to DB)
-        const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-        localSessions.forEach((s) => {
-          if (
-            !merged.find((m) => m.id === s.id) &&
-            s.lastUpdate > thirtyDaysAgo &&
-            (s.messages.length > 0 || s.topic !== DEFAULT_TOPIC)
-          ) {
-            merged.unshift(s);
-          }
-        });
-        set({ sessions: merged, currentSessionIndex: 0 });
+        set({ sessions, currentSessionIndex: 0 });
       },
       setLastInput(lastInput: string) {
         set({
@@ -1124,6 +1107,10 @@ export const useChatStore = createPersistStore(
       }
 
       return newState as any;
+    },
+    partialize: (state) => {
+      const { sessions, ...rest } = state as any;
+      return rest;
     },
   },
 );
