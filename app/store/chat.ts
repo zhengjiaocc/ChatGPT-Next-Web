@@ -234,6 +234,8 @@ function isLoggedIn() {
 async function syncSessionToDB(session: ChatSession) {
   if (!isLoggedIn()) return;
   if (session.messages.length === 0 && session.topic === DEFAULT_TOPIC) return;
+  // Skip sync while any message is still streaming
+  if (session.messages.some((m) => m.streaming)) return;
   await fetch("/api/db/sessions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -803,7 +805,10 @@ export const useChatStore = createPersistStore(
                 : modelConfig.providerId,
             },
             onFinish(message, responseRes) {
-              if (responseRes?.status === 200) {
+              if (
+                message &&
+                (responseRes == null || responseRes.status === 200)
+              ) {
                 let topic = message;
                 // handle JSON response like {"cause":{"name":"..."}}
                 try {
