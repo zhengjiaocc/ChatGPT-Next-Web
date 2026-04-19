@@ -635,7 +635,7 @@ export const useChatStore = createPersistStore(
         const session = get().currentSession();
         const modelConfig = session.mask.modelConfig;
         const clearContextIndex = session.clearContextIndex ?? 0;
-        const messages = session.messages.slice();
+        const messages = session.messages.filter((m) => !m.streaming).slice();
         const totalMessageCount = session.messages.length;
 
         // in-context prompts
