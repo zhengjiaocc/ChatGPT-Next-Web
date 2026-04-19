@@ -565,6 +565,10 @@ export const useChatStore = createPersistStore(
             });
             if (message) get().updateStat(botMessage, session);
             get().checkMcpJson(botMessage);
+            get().summarizeSession(
+              false,
+              get().sessions.find((s) => s.id === session.id) ?? session,
+            );
             ChatControllerPool.remove(session.id, botMessage.id);
           },
           onBeforeTool(tool: ChatMessageTool) {
