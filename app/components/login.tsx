@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { Path } from "../constant";
@@ -22,8 +22,10 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef<any>(null);
 
   const submit = async () => {
+    if (loading) return;
     if (!username.trim() || !password.trim()) {
       setError("用户名和密码不能为空");
       return;
@@ -46,11 +48,15 @@ export function LoginPage() {
     setLoading(false);
     if (!res.ok) {
       setError(data.error ?? "操作失败");
+      setTurnstileToken("");
+      turnstileRef.current?.reset();
       return;
     }
     if (mode === "register") {
       setMode("login");
       setError("注册成功，请登录");
+      setTurnstileToken("");
+      turnstileRef.current?.reset();
       return;
     }
     userStore.login(data.id, data.username);
@@ -107,6 +113,7 @@ export function LoginPage() {
 
         {TURNSTILE_SITE_KEY && (
           <Turnstile
+            ref={turnstileRef}
             siteKey={TURNSTILE_SITE_KEY}
             onSuccess={setTurnstileToken}
             onExpire={() => setTurnstileToken("")}

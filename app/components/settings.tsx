@@ -1171,9 +1171,9 @@ export function Settings() {
                 开源声明 / Open Source Licenses
               </div>
               <div className={styles["settings-license-content"]}>
-                本项目基于 NextChat 进行二次开发
+                本项目基于 NoneChat 进行二次开发
                 <br />
-                Original Project: NextChat · Copyright (c) 2023 Yidadaa · MIT
+                Original Project: NoneChat · Copyright (c) 2023 Yidadaa · MIT
                 License
                 <br />
                 <a

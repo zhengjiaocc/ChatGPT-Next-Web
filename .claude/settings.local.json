@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout:*)",
+      "Bash(npm run:*)",
+      "Bash(curl -s http://localhost:3000 -o /dev/null -w \"%{http_code}\")",
+      "Bash(npm install:*)",
+      "Bash(curl -s http://localhost:3001 -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X MKCOL \"https://list.zhengjiao.cc/dav/chatgpt-next-web\" -u \"admin:xcy2019..\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X PUT \"https://list.zhengjiao.cc/dav/chatgpt-next-web/backup.json\" -u \"admin:xcy2019..\" -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X PUT \"https://list.zhengjiao.cc/dav/test.json\" -u \"admin:xcy2019..\" -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(curl -s -X PROPFIND \"https://list.zhengjiao.cc/dav/\" -u \"admin:xcy2019..\" -H \"Depth: 1\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X PUT \"https://list.zhengjiao.cc/dav/alipan/test.json\" -u \"admin:xcy2019..\" -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(curl -s -X PROPFIND \"https://list.zhengjiao.cc/dav/alipan/\" -u \"admin:xcy2019..\" -H \"Depth: 1\")",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(curl -s -X PROPFIND \"https://list.zhengjiao.cc/dav/alipan/nextChat/\" -u \"admin:xcy2019..\" -H \"Depth: 1\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X PUT \"https://list.zhengjiao.cc/dav/alipan/nextChat/chatgpt-next-web/backup.json\" -u \"admin:xcy2019..\" -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X PUT \"https://list.zhengjiao.cc/dav/alipan/nextChat/backup.json\" -u \"admin:xcy2019..\" -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(git merge:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(node -e ':*)",
+      "Bash(npx tsc:*)",
+      "Bash(yarn add:*)",
+      "Bash(yarn remove:*)",
+      "Bash(grep -rn \"animation:\" app/components/*.module.scss app/styles/*.scss)",
+      "Bash(git restore:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
