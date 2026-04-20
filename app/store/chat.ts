@@ -978,7 +978,7 @@ export const useChatStore = createPersistStore(
         }
         const rows = await res.json();
         if (!Array.isArray(rows) || rows.length === 0) {
-          set({ dbLoaded: true });
+          set({ sessions: [createEmptySession()], dbLoaded: true });
           return;
         }
         const filteredRows = rows.filter(
@@ -989,7 +989,7 @@ export const useChatStore = createPersistStore(
           .filter((r: any) => !filteredRows.includes(r))
           .forEach((r: any) => deleteSessionFromDB(r.id));
         if (!filteredRows.length) {
-          set({ dbLoaded: true });
+          set({ sessions: [createEmptySession()], dbLoaded: true });
           return;
         }
         const providers = useProviderStore.getState().providers;

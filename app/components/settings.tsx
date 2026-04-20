@@ -819,6 +819,7 @@ export function Settings() {
                   text="退出"
                   onClick={async () => {
                     await fetch("/api/auth/logout", { method: "POST" });
+                    useChatStore.getState().clearSessions();
                     userStore.logout();
                     navigate(Path.Login);
                   }}
