@@ -14,7 +14,7 @@ export function getClientConfig() {
 
 function queryMeta(key: string, defaultValue?: string): string {
   let ret: string;
-  if (document) {
+  if (typeof document !== "undefined") {
     const meta = document.head.querySelector(
       `meta[name='${key}']`,
     ) as HTMLMetaElement;
