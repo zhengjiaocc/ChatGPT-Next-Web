@@ -269,6 +269,8 @@ export function Home() {
       useChatStore.getState().loadFromDB();
       useProviderStore.getState().loadFromDB();
       useAppConfig.getState().loadFromDB();
+    } else {
+      useChatStore.setState({ dbLoaded: true });
     }
 
     const initMcp = async () => {
