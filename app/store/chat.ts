@@ -114,6 +114,7 @@ function createEmptySession(): ChatSession {
     topic: DEFAULT_TOPIC,
     memoryPrompt: "",
     messages: [],
+    messagesLoaded: true,
     stat: {
       tokenCount: 0,
       wordCount: 0,

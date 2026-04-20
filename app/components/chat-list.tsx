@@ -115,6 +115,8 @@ export function ChatList(props: { narrow?: boolean }) {
   const navigate = useNavigate();
   const isMobileScreen = useMobileScreen();
 
+  if (!chatStore.dbLoaded) return null;
+
   const onDragEnd: OnDragEndResponder = (result) => {
     const { destination, source } = result;
     if (!destination) {
