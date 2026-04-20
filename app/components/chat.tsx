@@ -1874,7 +1874,7 @@ function _Chat() {
                 setAutoScroll(false);
               }}
             >
-              {session.messagesLoaded === false ? (
+              {session.messagesLoaded === false || !chatStore.dbLoaded ? (
                 <div
                   style={{
                     display: "flex",
@@ -2281,12 +2281,6 @@ function _Chat() {
 export function Chat() {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
-  const keyRef = useRef(session.id);
-  const dbLoadedRef = useRef(chatStore.dbLoaded);
-  if (dbLoadedRef.current) {
-    keyRef.current = session.id;
-  } else if (chatStore.dbLoaded) {
-    dbLoadedRef.current = true;
-  }
-  return <_Chat key={keyRef.current}></_Chat>;
+  if (!chatStore.dbLoaded) return null;
+  return <_Chat key={session.id}></_Chat>;
 }

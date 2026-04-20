@@ -54,6 +54,7 @@ const Settings = dynamic(async () => (await import("./settings")).Settings, {
 
 const Chat = dynamic(async () => (await import("./chat")).Chat, {
   loading: () => <Loading noLogo />,
+  ssr: false,
 });
 
 const NewChat = dynamic(async () => (await import("./new-chat")).NewChat, {
