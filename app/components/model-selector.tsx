@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Avatar } from "./emoji";
 import { PROVIDER_ICON_MODEL } from "../utils/provider-icons";
 import LeftIcon from "../icons/left.svg";
+import clsx from "clsx";
 import styles from "./model-selector.module.scss";
 
 interface ProviderGroup {
@@ -53,9 +54,9 @@ export function ModelSelector(props: {
   return (
     <div className={styles["mask"]} onClick={props.onClose}>
       <div
-        className={`${styles["container"]} ${
-          !splitView ? styles["list-mode"] : ""
-        }`}
+        className={clsx(styles["container"], {
+          [styles["list-mode"]]: !splitView,
+        })}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -84,11 +85,62 @@ export function ModelSelector(props: {
             />
           </div>
           <button
-            className={styles["layout-toggle"]}
+            className={clsx(styles["layout-toggle"], {
+              [styles["layout-toggle-active"]]: !splitView,
+            })}
             onClick={() => setSplitView(!splitView)}
             title={splitView ? "切换为列表视图" : "切换为分栏视图"}
+            aria-label={splitView ? "切换为列表视图" : "切换为分栏视图"}
           >
-            {splitView ? "☰" : "⊞"}
+            {splitView ? (
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none">
+                <path
+                  d="M4 7H20M4 12H20M4 17H20"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none">
+                <rect
+                  x="4"
+                  y="4"
+                  width="6"
+                  height="6"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+                <rect
+                  x="14"
+                  y="4"
+                  width="6"
+                  height="6"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+                <rect
+                  x="4"
+                  y="14"
+                  width="6"
+                  height="6"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+                <rect
+                  x="14"
+                  y="14"
+                  width="6"
+                  height="6"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+              </svg>
+            )}
           </button>
         </div>
 
@@ -99,9 +151,9 @@ export function ModelSelector(props: {
               {props.groups.map((g) => (
                 <div
                   key={g.provider}
-                  className={`${styles["provider-item"]} ${
-                    g.provider === activeProvider ? styles["active"] : ""
-                  }`}
+                  className={clsx(styles["provider-item"], {
+                    [styles["active"]]: g.provider === activeProvider,
+                  })}
                   onClick={() => {
                     setActiveProvider(g.provider);
                     setSearch("");
@@ -138,9 +190,9 @@ export function ModelSelector(props: {
                 return (
                   <div
                     key={value}
-                    className={`${styles["model-item"]} ${
-                      selected ? styles["selected"] : ""
-                    }`}
+                    className={clsx(styles["model-item"], {
+                      [styles["selected"]]: selected,
+                    })}
                     onClick={() => {
                       props.onSelect(value);
                       props.onClose();
@@ -164,11 +216,10 @@ export function ModelSelector(props: {
                     onClick={() => toggleProvider(g.provider)}
                   >
                     <LeftIcon
-                      className={
-                        expanded
-                          ? styles["icon-expanded"]
-                          : styles["icon-collapsed"]
-                      }
+                      className={clsx(styles["group-arrow"], {
+                        [styles["icon-expanded"]]: expanded,
+                        [styles["icon-collapsed"]]: !expanded,
+                      })}
                     />
                     <Avatar
                       model={
@@ -185,8 +236,12 @@ export function ModelSelector(props: {
                       {g.models.length} 个模型
                     </span>
                   </div>
-                  {expanded &&
-                    g.models.map((m) => {
+                  <div
+                    className={clsx(styles["list-group-models"], {
+                      [styles["expanded"]]: expanded,
+                    })}
+                  >
+                    {g.models.map((m) => {
                       const value = m.providerId
                         ? `${m.name}@${g.provider}|${m.providerId}`
                         : `${m.name}@${g.provider}`;
@@ -196,9 +251,9 @@ export function ModelSelector(props: {
                       return (
                         <div
                           key={value}
-                          className={`${styles["list-model-item"]} ${
-                            selected ? styles["selected"] : ""
-                          }`}
+                          className={clsx(styles["list-model-item"], {
+                            [styles["selected"]]: selected,
+                          })}
                           onClick={() => {
                             props.onSelect(value);
                             props.onClose();
@@ -209,6 +264,7 @@ export function ModelSelector(props: {
                         </div>
                       );
                     })}
+                  </div>
                 </div>
               );
             })}

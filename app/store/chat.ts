@@ -44,6 +44,25 @@ import { extractMcpJson, isMcpJson } from "../mcp/utils";
 import { useUserStore } from "./user";
 
 const localStorage = safeLocalStorage();
+const DB_FETCH_TIMEOUT = 12_000;
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  timeoutMs = DB_FETCH_TIMEOUT,
+) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 export type ChatMessageTool = {
   id: string;
@@ -235,37 +254,106 @@ function isLoggedIn() {
   return useUserStore.getState().loggedIn;
 }
 
-async function syncSessionToDB(session: ChatSession, retries = 3) {
-  if (!isLoggedIn()) return;
+type SessionSyncPayload = {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  model: string;
+  mask: Mask;
+  memoryPrompt: string;
+  lastSummarizeIndex: number;
+};
+
+const SESSION_SYNC_DEBOUNCE_MS = 500;
+const sessionSyncTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const pendingSessionSyncPayload = new Map<string, SessionSyncPayload>();
+const sessionSyncRunning = new Map<string, boolean>();
+
+function clearAllSessionSyncTasks() {
+  sessionSyncTimers.forEach((timer) => clearTimeout(timer));
+  sessionSyncTimers.clear();
+  pendingSessionSyncPayload.clear();
+  sessionSyncRunning.clear();
+}
+
+function buildSessionSyncPayload(
+  session: ChatSession,
+): SessionSyncPayload | undefined {
   if (session.messagesLoaded === false) return;
   if (session.messages.length === 0 && session.topic === DEFAULT_TOPIC) return;
-  // Filter out streaming messages before sync
   const messages = session.messages.filter((m) => !m.streaming);
   if (messages.length === 0) return;
+  return {
+    id: session.id,
+    title: session.topic,
+    messages,
+    model: session.mask.modelConfig.model,
+    mask: session.mask,
+    memoryPrompt: session.memoryPrompt,
+    lastSummarizeIndex: session.lastSummarizeIndex,
+  };
+}
+
+async function syncSessionPayloadToDB(
+  payload: SessionSyncPayload,
+  retries = 3,
+) {
   for (let i = 0; i < retries; i++) {
     try {
-      const res = await fetch("/api/db/sessions", {
+      const res = await fetchWithTimeout("/api/db/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: session.id,
-          title: session.topic,
-          messages,
-          model: session.mask.modelConfig.model,
-          mask: session.mask,
-          memoryPrompt: session.memoryPrompt,
-          lastSummarizeIndex: session.lastSummarizeIndex,
-        }),
+        body: JSON.stringify(payload),
       });
-      if (res.ok) return;
+      if (res.ok) return true;
     } catch (e) {
       if (i === retries - 1) console.error("[Sync] failed to sync session", e);
     }
   }
+  return false;
+}
+
+async function flushSessionSyncQueue(sessionId: string) {
+  if (sessionSyncRunning.get(sessionId)) return;
+  const payload = pendingSessionSyncPayload.get(sessionId);
+  if (!payload) return;
+
+  sessionSyncRunning.set(sessionId, true);
+  pendingSessionSyncPayload.delete(sessionId);
+  try {
+    await syncSessionPayloadToDB(payload);
+  } finally {
+    sessionSyncRunning.set(sessionId, false);
+    if (pendingSessionSyncPayload.has(sessionId)) {
+      void flushSessionSyncQueue(sessionId);
+    }
+  }
+}
+
+async function syncSessionToDB(session: ChatSession) {
+  if (!isLoggedIn()) return;
+  const payload = buildSessionSyncPayload(session);
+  if (!payload) return;
+
+  pendingSessionSyncPayload.set(session.id, payload);
+  const timer = sessionSyncTimers.get(session.id);
+  if (timer) clearTimeout(timer);
+  sessionSyncTimers.set(
+    session.id,
+    setTimeout(() => {
+      sessionSyncTimers.delete(session.id);
+      void flushSessionSyncQueue(session.id);
+    }, SESSION_SYNC_DEBOUNCE_MS),
+  );
 }
 
 async function deleteSessionFromDB(id: string) {
   if (!isLoggedIn()) return;
+  const timer = sessionSyncTimers.get(id);
+  if (timer) clearTimeout(timer);
+  sessionSyncTimers.delete(id);
+  pendingSessionSyncPayload.delete(id);
+  sessionSyncRunning.delete(id);
   await fetch("/api/db/sessions", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
@@ -278,6 +366,7 @@ const DEFAULT_CHAT_STATE = {
   currentSessionIndex: 0,
   lastInput: "",
   dbLoaded: false,
+  dbLoadState: "idle" as "idle" | "loading" | "ready" | "error",
 };
 
 export const useChatStore = createPersistStore(
@@ -319,6 +408,7 @@ export const useChatStore = createPersistStore(
       },
 
       clearSessions() {
+        clearAllSessionSyncTasks();
         set(() => ({
           sessions: [createEmptySession()],
           currentSessionIndex: 0,
@@ -962,75 +1052,106 @@ export const useChatStore = createPersistStore(
         if (!skipSync) syncSessionToDB(sessions[index]);
       },
       async clearAllData() {
+        clearAllSessionSyncTasks();
         await indexedDBStorage.clear();
         localStorage.clear();
         location.reload();
       },
       async loadFromDB() {
+        set({ dbLoaded: false, dbLoadState: "loading" });
         if (!isLoggedIn()) {
-          set({ dbLoaded: true });
+          set({ dbLoaded: true, dbLoadState: "ready" });
           return;
         }
-        const res = await fetch("/api/db/sessions");
-        if (!res.ok) {
-          set({ dbLoaded: true });
-          return;
-        }
-        const rows = await res.json();
-        if (!Array.isArray(rows) || rows.length === 0) {
-          set({ sessions: [createEmptySession()], dbLoaded: true });
-          return;
-        }
-        const filteredRows = rows.filter(
-          (r: any) => (r.message_count ?? 0) > 0 || r.title !== DEFAULT_TOPIC,
-        );
-        // Clean up empty sessions from DB
-        rows
-          .filter((r: any) => !filteredRows.includes(r))
-          .forEach((r: any) => deleteSessionFromDB(r.id));
-        if (!filteredRows.length) {
-          set({ sessions: [createEmptySession()], dbLoaded: true });
-          return;
-        }
-        const providers = useProviderStore.getState().providers;
-        const sessions: ChatSession[] = filteredRows.map((r: any) => {
-          const session = {
-            ...createEmptySession(),
-            id: r.id,
-            topic: r.title,
-            messages: [],
-            messagesLoaded: false as const,
-            messageCount: r.message_count ?? 0,
-            mask: r.mask ?? createEmptyMask(),
-            memoryPrompt: r.memory_prompt ?? "",
-            lastSummarizeIndex: r.last_summarize_index ?? 0,
-            lastUpdate: new Date(r.updated_at).getTime(),
-          };
-          // Auto-fill providerId if missing
-          if (!session.mask.modelConfig.providerId) {
-            const { model, providerName } = session.mask.modelConfig;
-            const provider =
-              providers.find(
-                (p) =>
-                  p.enabled &&
-                  p.type.toLowerCase() === (providerName ?? "").toLowerCase() &&
-                  p.models.includes(model),
-              ) ??
-              providers.find(
-                (p) =>
-                  p.enabled &&
-                  p.type.toLowerCase() === (providerName ?? "").toLowerCase(),
-              ) ??
-              providers.find((p) => p.enabled);
-            if (provider) {
-              session.mask.modelConfig.providerId = provider.id;
-              if (provider.type !== providerName)
-                session.mask.modelConfig.providerName = provider.type as any;
-            }
+        try {
+          const res = await fetchWithTimeout("/api/db/sessions");
+          if (res.status === 401) {
+            useUserStore.getState().logout();
+            set({
+              sessions: [createEmptySession()],
+              currentSessionIndex: 0,
+              dbLoaded: true,
+              dbLoadState: "ready",
+            });
+            return;
           }
-          return session;
-        });
-        set({ sessions, currentSessionIndex: 0, dbLoaded: true });
+          if (!res.ok) {
+            set({ dbLoaded: true, dbLoadState: "error" });
+            return;
+          }
+          const rows = await res.json();
+          if (!Array.isArray(rows) || rows.length === 0) {
+            set({
+              sessions: [createEmptySession()],
+              dbLoaded: true,
+              dbLoadState: "ready",
+            });
+            return;
+          }
+          const filteredRows = rows.filter(
+            (r: any) => (r.message_count ?? 0) > 0 || r.title !== DEFAULT_TOPIC,
+          );
+          // Clean up empty sessions from DB
+          rows
+            .filter((r: any) => !filteredRows.includes(r))
+            .forEach((r: any) => deleteSessionFromDB(r.id));
+          if (!filteredRows.length) {
+            set({
+              sessions: [createEmptySession()],
+              dbLoaded: true,
+              dbLoadState: "ready",
+            });
+            return;
+          }
+          const providers = useProviderStore.getState().providers;
+          const sessions: ChatSession[] = filteredRows.map((r: any) => {
+            const session = {
+              ...createEmptySession(),
+              id: r.id,
+              topic: r.title,
+              messages: [],
+              messagesLoaded: false as const,
+              messageCount: r.message_count ?? 0,
+              mask: r.mask ?? createEmptyMask(),
+              memoryPrompt: r.memory_prompt ?? "",
+              lastSummarizeIndex: r.last_summarize_index ?? 0,
+              lastUpdate: new Date(r.updated_at).getTime(),
+            };
+            // Auto-fill providerId if missing
+            if (!session.mask.modelConfig.providerId) {
+              const { model, providerName } = session.mask.modelConfig;
+              const provider =
+                providers.find(
+                  (p) =>
+                    p.enabled &&
+                    p.type.toLowerCase() ===
+                      (providerName ?? "").toLowerCase() &&
+                    p.models.includes(model),
+                ) ??
+                providers.find(
+                  (p) =>
+                    p.enabled &&
+                    p.type.toLowerCase() === (providerName ?? "").toLowerCase(),
+                ) ??
+                providers.find((p) => p.enabled);
+              if (provider) {
+                session.mask.modelConfig.providerId = provider.id;
+                if (provider.type !== providerName)
+                  session.mask.modelConfig.providerName = provider.type as any;
+              }
+            }
+            return session;
+          });
+          set({
+            sessions,
+            currentSessionIndex: 0,
+            dbLoaded: true,
+            dbLoadState: "ready",
+          });
+        } catch (e) {
+          console.error("[Chat] failed to load sessions from db", e);
+          set({ dbLoaded: true, dbLoadState: "error" });
+        }
       },
       setLastInput(lastInput: string) {
         set({
@@ -1041,20 +1162,38 @@ export const useChatStore = createPersistStore(
       async loadSessionMessages(sessionId: string) {
         const index = get().sessions.findIndex((s) => s.id === sessionId);
         if (index < 0 || get().sessions[index].messagesLoaded) return;
-        const res = await fetch(`/api/db/sessions/${sessionId}`);
-        if (!res.ok) return;
-        const row = await res.json();
-        set((state) => {
-          const idx = state.sessions.findIndex((s) => s.id === sessionId);
-          if (idx < 0) return state;
-          const updated = [...state.sessions];
-          updated[idx] = {
-            ...updated[idx],
-            messages: row.messages ?? [],
-            messagesLoaded: true,
-          };
-          return { sessions: updated };
-        });
+        try {
+          const res = await fetchWithTimeout(`/api/db/sessions/${sessionId}`);
+          if (res.status === 401) {
+            useUserStore.getState().logout();
+            throw new Error("unauthorized");
+          }
+          if (!res.ok) throw new Error(`load failed: ${res.status}`);
+          const row = await res.json();
+          set((state) => {
+            const idx = state.sessions.findIndex((s) => s.id === sessionId);
+            if (idx < 0) return state;
+            const updated = [...state.sessions];
+            updated[idx] = {
+              ...updated[idx],
+              messages: row.messages ?? [],
+              messagesLoaded: true,
+            };
+            return { sessions: updated };
+          });
+        } catch (e) {
+          console.error("[Chat] failed to load session messages", e);
+          set((state) => {
+            const idx = state.sessions.findIndex((s) => s.id === sessionId);
+            if (idx < 0) return state;
+            const updated = [...state.sessions];
+            updated[idx] = {
+              ...updated[idx],
+              messagesLoaded: true,
+            };
+            return { sessions: updated };
+          });
+        }
       },
 
       /** check if the message contains MCP JSON and execute the MCP action */
@@ -1162,7 +1301,7 @@ export const useChatStore = createPersistStore(
       return newState as any;
     },
     partialize: (state) => {
-      const { sessions, dbLoaded, ...rest } = state as any;
+      const { dbLoaded, dbLoadState, ...rest } = state as any;
       return rest;
     },
   },

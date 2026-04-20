@@ -214,6 +214,11 @@ export const useAppConfig = createPersistStore(
     async loadFromDB() {
       if (!isLoggedIn()) return;
       const res = await fetch("/api/db/config");
+      if (res.status === 401) {
+        useUserStore.getState().logout();
+        set(() => ({ ...DEFAULT_CONFIG }));
+        return;
+      }
       if (!res.ok) return;
       const config = await res.json();
       if (config && Object.keys(config).length > 0) {

@@ -117,7 +117,9 @@ export const useProviderStore = createPersistStore(
           p.id === id ? { ...p, ...patch } : p,
         ),
       }));
-      const updated = useProviderStore.getState().providers.find((p) => p.id === id);
+      const updated = useProviderStore
+        .getState()
+        .providers.find((p) => p.id === id);
       if (updated) syncProviderToDB(updated);
     },
 
@@ -132,7 +134,9 @@ export const useProviderStore = createPersistStore(
       set((s) => ({
         providers: s.providers.map((p) => (p.id === id ? { ...p, models } : p)),
       }));
-      const updated = useProviderStore.getState().providers.find((p) => p.id === id);
+      const updated = useProviderStore
+        .getState()
+        .providers.find((p) => p.id === id);
       if (updated) syncProviderToDB(updated);
     },
 
@@ -152,6 +156,11 @@ export const useProviderStore = createPersistStore(
     async loadFromDB() {
       if (!isLoggedIn()) return;
       const res = await fetch("/api/db/providers");
+      if (res.status === 401) {
+        useUserStore.getState().logout();
+        set({ providers: [] });
+        return;
+      }
       if (!res.ok) return;
       const rows = await res.json();
       if (!Array.isArray(rows) || rows.length === 0) return;

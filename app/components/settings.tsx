@@ -68,6 +68,7 @@ import { getClientConfig } from "../config/client";
 import { useSyncStore } from "../store/sync";
 import { nanoid } from "nanoid";
 import { useMaskStore } from "../store/mask";
+import { useProviderStore } from "../store/provider";
 import { ProviderType } from "../utils/cloud";
 import { TTSConfigList } from "./tts-config";
 import { RealtimeConfigList } from "./realtime-chat/realtime-config";
@@ -820,6 +821,8 @@ export function Settings() {
                   onClick={async () => {
                     await fetch("/api/auth/logout", { method: "POST" });
                     useChatStore.getState().clearSessions();
+                    useProviderStore.setState({ providers: [] });
+                    useAppConfig.getState().reset();
                     userStore.logout();
                     navigate(Path.Login);
                   }}

@@ -35,6 +35,24 @@ import { useUserStore } from "../store/user";
 import clsx from "clsx";
 import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
 
+const INIT_LOAD_TIMEOUT = 10_000;
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`timeout after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise
+      .then((value) => resolve(value))
+      .catch((error) => reject(error))
+      .finally(() => clearTimeout(timeoutId));
+  });
+}
+
 export function Loading(props: { noLogo?: boolean }) {
   return (
     <div className={clsx("no-dark", styles["loading-content"])}>
@@ -168,6 +186,7 @@ function Screen() {
   const navigate = useNavigate();
   const accessStore = useAccessStore();
   const userStore = useUserStore();
+  const accessCode = accessStore.accessCode;
   const isArtifact = location.pathname.includes(Path.Artifacts);
   const isHome = location.pathname === Path.Home;
   const isAuth = location.pathname === Path.Auth;
@@ -188,12 +207,11 @@ function Screen() {
     if (
       !userStore.loggedIn &&
       !accessStore.isAuthorized() &&
-      !accessStore.accessCode.trim()
+      !accessCode.trim()
     ) {
       navigate(Path.Login);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAuth, isLogin, navigate, userStore.loggedIn, accessCode]);
 
   if (isArtifact) {
     return (
@@ -261,18 +279,11 @@ export function Home() {
   useSwitchTheme();
   useLoadData();
   useHtmlLang();
+  const userStore = useUserStore();
 
   useEffect(() => {
     console.log("[Config] got config from build time", getClientConfig());
     useAccessStore.getState().fetch();
-
-    if (useUserStore.getState().loggedIn) {
-      useChatStore.getState().loadFromDB();
-      useProviderStore.getState().loadFromDB();
-      useAppConfig.getState().loadFromDB();
-    } else {
-      useChatStore.setState({ dbLoaded: true });
-    }
 
     const initMcp = async () => {
       try {
@@ -288,6 +299,67 @@ export function Home() {
     };
     initMcp();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadUserData = async () => {
+      try {
+        const totalStart = performance.now();
+        if (!userStore.loggedIn) {
+          useChatStore.setState({ dbLoaded: true, dbLoadState: "ready" });
+          console.debug("[Init] guest mode ready");
+          return;
+        }
+
+        // Logged-in mode uses cloud as source of truth.
+        useChatStore.getState().clearSessions();
+        useProviderStore.setState({ providers: [] });
+        useAppConfig.getState().reset();
+
+        const providerStart = performance.now();
+        const providerTask = withTimeout(
+          useProviderStore.getState().loadFromDB(),
+          INIT_LOAD_TIMEOUT,
+        );
+        const configTask = withTimeout(
+          useAppConfig.getState().loadFromDB(),
+          INIT_LOAD_TIMEOUT,
+        );
+        await Promise.allSettled([providerTask, configTask]);
+        const sharedLoadedAt = performance.now();
+        console.debug(
+          "[Init] shared stores loaded in",
+          Math.round(sharedLoadedAt - providerStart),
+          "ms",
+        );
+
+        if (cancelled) return;
+        const chatStart = performance.now();
+        await useChatStore.getState().loadFromDB();
+        const chatLoadedAt = performance.now();
+        console.debug(
+          "[Init] chat sessions loaded in",
+          Math.round(chatLoadedAt - chatStart),
+          "ms",
+        );
+        console.debug(
+          "[Init] total ready in",
+          Math.round(chatLoadedAt - totalStart),
+          "ms",
+        );
+      } catch (e) {
+        console.error("[Home] failed to initialize user data", e);
+        useChatStore.setState({ dbLoaded: true, dbLoadState: "error" });
+      }
+    };
+
+    loadUserData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userStore.loggedIn]);
 
   return (
     <ErrorBoundary>

@@ -8,10 +8,6 @@ import EyeIcon from "../icons/eye.svg";
 import EyeOffIcon from "../icons/eye-off.svg";
 import LoadingIcon from "../icons/three-dots.svg";
 import { useUserStore } from "../store/user";
-import { useChatStore } from "../store";
-import { useProviderStore } from "../store/provider";
-import { useAppConfig } from "../store/config";
-import { getClientApi } from "../client/api";
 import styles from "./login.module.scss";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
@@ -58,63 +54,6 @@ export function LoginPage() {
       return;
     }
     userStore.login(data.id, data.username);
-    // 登录后初始化：加载 DB 数据
-    await Promise.all([
-      useChatStore.getState().loadFromDB(),
-      useProviderStore.getState().loadFromDB(),
-      useAppConfig.getState().loadFromDB(),
-    ]);
-    // 自动发现所有 enabled provider 的模型
-    const providers = useProviderStore.getState().providers;
-    providers
-      .filter((p) => p.enabled && p.supportsDiscovery)
-      .forEach((p) => {
-        fetch("/api/provider-models", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: p.type,
-            apiKey: p.apiKey,
-            baseUrl: p.baseUrl,
-          }),
-        })
-          .then((r) => r.json())
-          .then((d) => {
-            if (d.models?.length)
-              useProviderStore.getState().setModels(p.id, d.models);
-          })
-          .catch(() => {});
-      });
-    const config = useAppConfig.getState();
-    // Fill providerId for global modelConfig based on providerName
-    const { model, providerName } = config.modelConfig;
-    const matchedProvider =
-      providers.find(
-        (p) =>
-          p.enabled &&
-          p.type.toLowerCase() === (providerName ?? "").toLowerCase() &&
-          p.models.includes(model),
-      ) ??
-      providers.find(
-        (p) =>
-          p.enabled &&
-          p.type.toLowerCase() === (providerName ?? "").toLowerCase(),
-      ) ??
-      providers.find((p) => p.enabled);
-    if (matchedProvider && !config.modelConfig.providerId) {
-      config.update((c) => {
-        c.modelConfig.providerId = matchedProvider.id;
-        if (matchedProvider.type !== providerName)
-          c.modelConfig.providerName = matchedProvider.type as any;
-        if (
-          matchedProvider.models.length > 0 &&
-          !matchedProvider.models.includes(model)
-        )
-          c.modelConfig.model = matchedProvider.models[0] as any;
-      });
-    }
-    const api = getClientApi(config.modelConfig.providerName);
-    api.llm.models().then((models) => config.mergeModels(models));
     navigate(Path.Chat);
   };
 

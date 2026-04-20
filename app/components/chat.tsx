@@ -124,7 +124,6 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from "../utils/ms_edge_tts";
 
 import { isEmpty } from "lodash-es";
 import { getModelProvider } from "../utils/model";
-import { RealtimeChat } from "@/app/components/realtime-chat";
 import clsx from "clsx";
 import { getAvailableClientsCount, isMcpEnabled } from "../mcp/actions";
 
@@ -135,6 +134,14 @@ const ttsPlayer = createTTSPlayer();
 const Markdown = dynamic(async () => (await import("./markdown")).Markdown, {
   loading: () => <LoadingIcon />,
 });
+
+const RealtimeChat = dynamic(
+  async () => (await import("@/app/components/realtime-chat")).RealtimeChat,
+  {
+    ssr: false,
+    loading: () => null,
+  },
+);
 
 const MCPAction = () => {
   const navigate = useNavigate();
@@ -1183,7 +1190,11 @@ function _Chat() {
     setIsLoading(true);
     chatStore
       .onUserInput(userInput, attachImages)
-      .then(() => setIsLoading(false));
+      .catch((e) => {
+        console.error("[Chat] failed to submit message", e);
+        showToast("消息发送失败，请稍后重试");
+      })
+      .finally(() => setIsLoading(false));
     setAttachImages([]);
     chatStore.setLastInput(userInput);
     setUserInput("");
@@ -1335,7 +1346,13 @@ function _Chat() {
     setIsLoading(true);
     const textContent = getMessageTextContent(userMessage);
     const images = getMessageImages(userMessage);
-    chatStore.onUserInput(textContent, images).then(() => setIsLoading(false));
+    chatStore
+      .onUserInput(textContent, images)
+      .catch((e) => {
+        console.error("[Chat] failed to resend message", e);
+        showToast("消息重试失败，请稍后重试");
+      })
+      .finally(() => setIsLoading(false));
     inputRef.current?.focus();
   };
 
@@ -2281,6 +2298,44 @@ function _Chat() {
 export function Chat() {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
-  if (!chatStore.dbLoaded) return null;
+  if (chatStore.dbLoadState === "error") {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          gap: 12,
+          width: "100%",
+          height: "100%",
+        }}
+      >
+        <div>会话加载失败</div>
+        <IconButton
+          text="重试"
+          type="primary"
+          onClick={() => {
+            chatStore.loadFromDB();
+          }}
+        />
+      </div>
+    );
+  }
+  if (!chatStore.dbLoaded) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          height: "100%",
+        }}
+      >
+        <LoadingIcon />
+      </div>
+    );
+  }
   return <_Chat key={session.id}></_Chat>;
 }
