@@ -1046,6 +1046,18 @@ function _Chat() {
     }
   }, [session?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // scroll to bottom when messages finish loading
+  useEffect(() => {
+    if (session?.messagesLoaded === true) {
+      const dom = scrollRef.current;
+      if (dom) {
+        requestAnimationFrame(() => {
+          dom.scrollTo(0, dom.scrollHeight);
+        });
+      }
+    }
+  }, [session?.messagesLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const config = useAppConfig();
   const providerStore = useProviderStore();
   const fontSize = config.fontSize;
