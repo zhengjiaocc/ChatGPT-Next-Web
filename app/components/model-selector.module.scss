@@ -36,8 +36,8 @@
   border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  width: 720px;
-  height: 520px;
+  width: 560px;
+  height: 480px;
   transition: width 0.25s ease;
   animation: panel-pop-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
   border: var(--border-in-light);
@@ -225,7 +225,7 @@
 }
 
 .left {
-  width: 220px;
+  width: 180px;
   border-right: var(--border-in-light);
   overflow-y: auto;
   overflow-x: hidden;
