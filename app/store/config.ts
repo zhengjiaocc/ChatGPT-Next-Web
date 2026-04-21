@@ -176,6 +176,14 @@ export const useAppConfig = createPersistStore(
       set((state) => ({ ...DEFAULT_CONFIG, sidebarWidth: state.sidebarWidth }));
     },
 
+    update(updater: (config: ChatConfig) => void) {
+      const state = get();
+      updater(state);
+      set({ ...state });
+      get().markUpdate();
+      get().syncToDB();
+    },
+
     mergeModels(newModels: LLMModel[]) {
       if (!newModels || newModels.length === 0) {
         return;
