@@ -665,3 +665,40 @@ export function streamWithThink(
   console.debug("[ChatAPI] start");
   chatApi(chatPath, headers, requestPayload, tools); // call fetchEventSource
 }
+export function normalizeMessages(messages: RequestMessage[]) {
+  const result: RequestMessage[] = [];
+  for (const message of messages) {
+    const lastMessage = result[result.length - 1];
+    if (lastMessage && lastMessage.role === message.role) {
+      // Merge content if roles are the same
+      if (
+        typeof lastMessage.content === "string" &&
+        typeof message.content === "string"
+      ) {
+        lastMessage.content += "\n\n" + message.content;
+      } else if (
+        Array.isArray(lastMessage.content) &&
+        Array.isArray(message.content)
+      ) {
+        lastMessage.content = lastMessage.content.concat(message.content);
+      } else if (
+        typeof lastMessage.content === "string" &&
+        Array.isArray(message.content)
+      ) {
+        lastMessage.content = ([
+          { type: "text", text: lastMessage.content },
+        ] as MultimodalContent[]).concat(message.content);
+      } else if (
+        Array.isArray(lastMessage.content) &&
+        typeof message.content === "string"
+      ) {
+        lastMessage.content = lastMessage.content.concat([
+          { type: "text", text: message.content },
+        ]);
+      }
+    } else {
+      result.push({ ...message });
+    }
+  }
+  return result;
+}

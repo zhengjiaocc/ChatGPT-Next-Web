@@ -479,28 +479,4 @@ export function semverCompare(a: string, b: string) {
     caseFirst: "upper",
   });
 }
-
-export function sanitizeMessages(messages: RequestMessage[]) {
-  const res: RequestMessage[] = [];
-  for (const item of messages) {
-    const last = res[res.length - 1];
-    if (last && last.role === item.role) {
-      // merge content
-      if (typeof last.content === "string" && typeof item.content === "string") {
-        last.content += "\n\n" + item.content;
-      } else {
-        // handle multimodal
-        const lastContent = Array.isArray(last.content)
-          ? last.content
-          : [{ type: "text", text: last.content }];
-        const itemContent = Array.isArray(item.content)
-          ? item.content
-          : [{ type: "text", text: item.content }];
-        last.content = [...lastContent, ...itemContent] as any;
-      }
-    } else {
-      res.push({ ...item });
-    }
-  }
-  return res;
-}
+export { normalizeMessages } from "./utils/chat";

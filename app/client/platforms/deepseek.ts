@@ -41,24 +41,22 @@ export class DeepSeekApi implements LLMApi {
   }
 
   async chat(options: ChatOptions) {
-    const rawMessages: ChatOptions["messages"] = [];
+    const messages: ChatOptions["messages"] = [];
     for (const v of options.messages) {
       if (v.role === "assistant") {
         const content = getMessageTextContentWithoutThinking(v);
-        rawMessages.push({ role: v.role, content });
+        messages.push({ role: v.role, content });
       } else {
         const content = getMessageTextContent(v);
-        rawMessages.push({ role: v.role, content });
+        messages.push({ role: v.role, content });
       }
     }
-
-    const sanitizedMessages = sanitizeMessages(rawMessages);
 
     // 检测并修复消息顺序，确保除system外的第一个消息是user
     const filteredMessages: ChatOptions["messages"] = [];
     let hasFoundFirstUser = false;
 
-    for (const msg of sanitizedMessages) {
+    for (const msg of messages) {
       if (msg.role === "system") {
         // Keep all system messages
         filteredMessages.push(msg);

@@ -1,7 +1,9 @@
+import {
+  getMessageTextContent,
   isDalle3,
   safeLocalStorage,
-  sanitizeMessages,
   trimTopic,
+  normalizeMessages,
 } from "../utils";
 
 import { indexedDBStorage } from "@/app/utils/indexedDB-storage";
@@ -639,7 +641,7 @@ export const useChatStore = createPersistStore(
           : getClientApi(modelConfig.providerName);
         // make request
         api.llm.chat({
-          messages: sendMessages,
+          messages: normalizeMessages(sendMessages),
           config: { ...modelConfig, stream: true },
           onUpdate(message) {
             botMessage.streaming = true;
@@ -929,8 +931,9 @@ export const useChatStore = createPersistStore(
                 content: Locale.Store.Prompt.Topic,
               }),
             );
+          const normalizedTopicMessages = normalizeMessages(topicMessages);
           api.llm.chat({
-            messages: sanitizeMessages(topicMessages),
+            messages: normalizedTopicMessages,
             config: {
               model,
               stream: false,
@@ -1004,7 +1007,7 @@ export const useChatStore = createPersistStore(
            **/
           const { max_tokens, ...modelcfg } = modelConfig;
           api.llm.chat({
-            messages: sanitizeMessages(
+            messages: normalizeMessages(
               toBeSummarizedMsgs.concat(
                 createMessage({
                   role: "system",
