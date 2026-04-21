@@ -261,23 +261,10 @@ function Screen() {
   );
 }
 
-export function useLoadData() {
-  const config = useAppConfig();
-  const api: ClientApi = getClientApi(config.modelConfig.providerName);
-
-  useEffect(() => {
-    if (!useUserStore.getState().loggedIn) return;
-    (async () => {
-      const models = await api.llm.models();
-      config.mergeModels(models);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-}
+// 已切除旧版强行获取公版模型库列表的抢跑钩子 (useLoadData)
 
 export function Home() {
   useSwitchTheme();
-  useLoadData();
   useHtmlLang();
   const userStore = useUserStore();
 
