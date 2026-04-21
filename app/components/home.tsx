@@ -339,6 +339,12 @@ export function Home() {
     };
   }, [userStore.loggedIn]);
 
+  const configHydrated = useAppConfig((state) => state._hasHydrated);
+
+  if (!configHydrated) {
+    return <Loading />;
+  }
+
   return (
     <ErrorBoundary>
       <Router>

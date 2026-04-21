@@ -172,7 +172,8 @@ export const useAppConfig = createPersistStore(
   { ...DEFAULT_CONFIG },
   (set, get) => ({
     reset() {
-      set(() => ({ ...DEFAULT_CONFIG }));
+      // 重置时保留纯本地视图属性（如侧边栏宽度），防止因页面重算导致的瞬间放缩闪烁闪跳
+      set((state) => ({ ...DEFAULT_CONFIG, sidebarWidth: state.sidebarWidth }));
     },
 
     mergeModels(newModels: LLMModel[]) {
@@ -222,7 +223,9 @@ export const useAppConfig = createPersistStore(
       if (!res.ok) return;
       const config = await res.json();
       if (config && Object.keys(config).length > 0) {
-        set((state) => ({ ...state, ...config }));
+        // 从云端配置中剔除 sidebarWidth，侧边栏大小应留在本地，漫游会导致桌面端收起状态被别的设备宽状态强行冲掉而闪烁
+        const { sidebarWidth, ...cloudConfig } = config;
+        set((state) => ({ ...state, ...cloudConfig }));
       }
     },
   }),
