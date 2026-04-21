@@ -66,11 +66,6 @@ export const useSdStore = createPersistStore<
         const accessStore = useAccessStore.getState();
         let prefix: string = ApiPath.Stability as string;
         let bearerToken = "";
-        if (!bearerToken && accessStore.enabledAccessControl()) {
-          bearerToken = getBearerToken(
-            ACCESS_CODE_PREFIX + accessStore.accessCode,
-          );
-        }
         const headers = {
           Accept: "application/json",
           Authorization: bearerToken,

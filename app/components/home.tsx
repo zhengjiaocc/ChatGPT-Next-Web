@@ -25,7 +25,6 @@ import {
 } from "react-router-dom";
 import { SideBar } from "./sidebar";
 import { useAppConfig } from "../store/config";
-import { AuthPage } from "./auth";
 import { LoginPage } from "./login";
 import { getClientConfig } from "../config/client";
 import { type ClientApi, getClientApi } from "../client/api";
@@ -184,8 +183,8 @@ function Screen() {
   const config = useAppConfig();
   const location = useLocation();
   const navigate = useNavigate();
-  const accessStore = useAccessStore();
   const userStore = useUserStore();
+  const isArtifact = location.pathname.includes(Path.Artifacts);
   const isHome = location.pathname === Path.Home;
   const isLogin = location.pathname === Path.Login;
   const isSd = location.pathname === Path.Sd;

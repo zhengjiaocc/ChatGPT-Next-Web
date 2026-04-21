@@ -1534,15 +1534,6 @@ function _Chat() {
     submit: (text) => {
       doSubmit(text);
     },
-    code: (text) => {
-      if (accessStore.disableFastLink) return;
-      console.log("[Command] got code from url: ", text);
-      showConfirm(Locale.URLCommand.Code + `code = ${text}`).then((res) => {
-        if (res) {
-          accessStore.update((access) => (access.accessCode = text));
-        }
-      });
-    },
   });
 
   // edit / insert message modal
