@@ -2281,20 +2281,5 @@ export function Chat() {
       </div>
     );
   }
-  if (!chatStore.dbLoaded) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: "100%",
-          height: "100%",
-        }}
-      >
-        <LoadingIcon />
-      </div>
-    );
-  }
   return <_Chat key={session.id}></_Chat>;
 }
