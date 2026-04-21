@@ -181,7 +181,7 @@ export const useAppConfig = createPersistStore(
       updater(state);
       set({ ...state });
       get().markUpdate();
-      get().syncToDB();
+      (get() as any).syncToDB();
     },
 
     mergeModels(newModels: LLMModel[]) {
