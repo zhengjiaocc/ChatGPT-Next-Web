@@ -1,7 +1,6 @@
-import {
-  getMessageTextContent,
   isDalle3,
   safeLocalStorage,
+  sanitizeMessages,
   trimTopic,
 } from "../utils";
 
@@ -931,7 +930,7 @@ export const useChatStore = createPersistStore(
               }),
             );
           api.llm.chat({
-            messages: topicMessages,
+            messages: sanitizeMessages(topicMessages),
             config: {
               model,
               stream: false,
@@ -1005,12 +1004,14 @@ export const useChatStore = createPersistStore(
            **/
           const { max_tokens, ...modelcfg } = modelConfig;
           api.llm.chat({
-            messages: toBeSummarizedMsgs.concat(
-              createMessage({
-                role: "system",
-                content: Locale.Store.Prompt.Summarize,
-                date: "",
-              }),
+            messages: sanitizeMessages(
+              toBeSummarizedMsgs.concat(
+                createMessage({
+                  role: "system",
+                  content: Locale.Store.Prompt.Summarize,
+                  date: "",
+                }),
+              ),
             ),
             config: {
               ...modelcfg,
