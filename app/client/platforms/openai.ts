@@ -260,7 +260,7 @@ export class ChatGPTApi implements LLMApi {
         chatPath = this.path(
           (isDalle3 ? Azure.ImagePath : Azure.ChatPath)(
             (model?.displayName ?? model?.name) as string,
-            useCustomConfig ? useAccessStore.getState().azureApiVersion : "",
+            "",
           ),
         );
       } else {
