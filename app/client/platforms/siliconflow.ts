@@ -44,33 +44,7 @@ export class SiliconflowApi implements LLMApi {
   private disableListModels = false;
 
   path(path: string): string {
-    const accessStore = useAccessStore.getState();
-
-    let baseUrl = "";
-
-    if (accessStore.useCustomConfig) {
-      baseUrl = accessStore.siliconflowUrl;
-    }
-
-    if (baseUrl.length === 0) {
-      const isApp = !!getClientConfig()?.isApp;
-      const apiPath = ApiPath.SiliconFlow;
-      baseUrl = isApp ? SILICONFLOW_BASE_URL : apiPath;
-    }
-
-    if (baseUrl.endsWith("/")) {
-      baseUrl = baseUrl.slice(0, baseUrl.length - 1);
-    }
-    if (
-      !baseUrl.startsWith("http") &&
-      !baseUrl.startsWith(ApiPath.SiliconFlow)
-    ) {
-      baseUrl = "https://" + baseUrl;
-    }
-
-    console.log("[Proxy Endpoint] ", baseUrl, path);
-
-    return [baseUrl, path].join("/");
+    return [ApiPath.SiliconFlow, path].join("/");
   }
 
   extractMessage(res: any) {

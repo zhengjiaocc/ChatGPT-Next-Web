@@ -65,28 +65,7 @@ function capitalizeKeys(obj: any): any {
 
 export class HunyuanApi implements LLMApi {
   path(): string {
-    const accessStore = useAccessStore.getState();
-
-    let baseUrl = "";
-
-    if (accessStore.useCustomConfig) {
-      baseUrl = accessStore.tencentUrl;
-    }
-
-    if (baseUrl.length === 0) {
-      const isApp = !!getClientConfig()?.isApp;
-      baseUrl = isApp ? TENCENT_BASE_URL : ApiPath.Tencent;
-    }
-
-    if (baseUrl.endsWith("/")) {
-      baseUrl = baseUrl.slice(0, baseUrl.length - 1);
-    }
-    if (!baseUrl.startsWith("http") && !baseUrl.startsWith(ApiPath.Tencent)) {
-      baseUrl = "https://" + baseUrl;
-    }
-
-    console.log("[Proxy Endpoint] ", baseUrl);
-    return baseUrl;
+    return ApiPath.Tencent;
   }
 
   extractMessage(res: any) {

@@ -46,30 +46,7 @@ interface RequestPayload {
 
 export class ErnieApi implements LLMApi {
   path(path: string): string {
-    const accessStore = useAccessStore.getState();
-
-    let baseUrl = "";
-
-    if (accessStore.useCustomConfig) {
-      baseUrl = accessStore.baiduUrl;
-    }
-
-    if (baseUrl.length === 0) {
-      const isApp = !!getClientConfig()?.isApp;
-      // do not use proxy for baidubce api
-      baseUrl = isApp ? BAIDU_BASE_URL : ApiPath.Baidu;
-    }
-
-    if (baseUrl.endsWith("/")) {
-      baseUrl = baseUrl.slice(0, baseUrl.length - 1);
-    }
-    if (!baseUrl.startsWith("http") && !baseUrl.startsWith(ApiPath.Baidu)) {
-      baseUrl = "https://" + baseUrl;
-    }
-
-    console.log("[Proxy Endpoint] ", baseUrl, path);
-
-    return [baseUrl, path].join("/");
+    return [ApiPath.Baidu, path].join("/");
   }
 
   speech(options: SpeechOptions): Promise<ArrayBuffer> {

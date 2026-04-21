@@ -192,42 +192,9 @@ export class ClientApi {
   masks() {}
 
   async share(messages: ChatMessage[], avatarUrl: string | null = null) {
-    const msgs = messages
-      .map((m) => ({
-        from: m.role === "user" ? "human" : "gpt",
-        value: m.content,
-      }))
-      .concat([
-        {
-          from: "human",
-          value:
-            "Share from [NoneChat]: https://github.com/Yidadaa/ChatGPT-Next-Web",
-        },
-      ]);
-    // 敬告二开开发者们，为了开源大模型的发展，请不要修改上述消息，此消息用于后续数据清洗使用
-    // Please do not modify this message
-
-    console.log("[Share]", messages, msgs);
-    const clientConfig = getClientConfig();
-    const proxyUrl = "/sharegpt";
-    const rawUrl = "https://sharegpt.com/api/conversations";
-    const shareUrl = clientConfig?.isApp ? rawUrl : proxyUrl;
-    const res = await fetch(shareUrl, {
-      body: JSON.stringify({
-        avatarUrl,
-        items: msgs,
-      }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-    });
-
-    const resJson = await res.json();
-    console.log("[Share]", resJson);
-    if (resJson.id) {
-      return `https://shareg.pt/${resJson.id}`;
-    }
+    // [企业级 SaaS 环境限制] 商业化服务严禁调用 sharegpt 公共开源分享引擎，防止由于内部运营聊天推向公域引发的安全客诉。
+    console.warn("Share function is disabled in private deployment.");
+    return null;
   }
 }
 
@@ -250,9 +217,8 @@ export function getHeaders(
   config?: LLMConfig,
 ) {
   const accessStore = useAccessStore.getState();
-  const chatStore = useChatStore.getState();
-  const _overrideApiKey = overrideApiKey || config?.overrideApiKey;
   let headers: Record<string, string> = {};
+
   if (!ignoreHeaders) {
     headers = {
       "Content-Type": "application/json",
@@ -260,127 +226,11 @@ export function getHeaders(
     };
   }
 
-  const clientConfig = getClientConfig();
+  // 服务端管控网关架构：前端绝不负责组装外部提供商(OpenAI等)鉴权秘钥。
+  // 一切请求仅透传站点通过本地鉴权(JWT/AccessCode)核验的票据。
+  const isEnabledAccessControl = accessStore.enabledAccessControl();
 
-  function getConfig() {
-    const sessionModelConfig = chatStore.currentSession().mask.modelConfig;
-    // Use config param's providerName/model if available (e.g. for title generation)
-    const effectiveProviderName =
-      config?.providerName ?? sessionModelConfig.providerName;
-    const effectiveModel = config?.model ?? sessionModelConfig.model;
-    const effectiveProviderId =
-      config?.providerId ?? sessionModelConfig.providerId;
-    const providerStore = useProviderStore.getState();
-
-    // Find provider by exact instance id only
-    const matchedProvider = effectiveProviderId
-      ? providerStore.providers.find(
-          (p) => p.enabled && p.id === effectiveProviderId,
-        )
-      : undefined;
-
-    const p = (effectiveProviderName ?? "").toLowerCase();
-    const isGoogle = p === "google";
-    const isAzure = p === "azure";
-    const isAnthropic = p === "anthropic";
-    const isBaidu = p === "baidu";
-    const isByteDance = p === "bytedance";
-    const isAlibaba = p === "alibaba";
-    const isMoonshot = p === "moonshot";
-    const isIflytek = p === "iflytek";
-    const isDeepSeek = p === "deepseek";
-    const isXAI = p === "xai";
-    const isChatGLM = p === "chatglm";
-    const isSiliconFlow = p === "siliconflow";
-    const isAI302 = p === "302.ai";
-    const isEnabledAccessControl = accessStore.enabledAccessControl();
-    const apiKey = isGoogle
-      ? accessStore.googleApiKey
-      : isAzure
-      ? accessStore.azureApiKey
-      : isAnthropic
-      ? accessStore.anthropicApiKey
-      : isByteDance
-      ? accessStore.bytedanceApiKey
-      : isAlibaba
-      ? accessStore.alibabaApiKey
-      : isMoonshot
-      ? accessStore.moonshotApiKey
-      : isXAI
-      ? accessStore.xaiApiKey
-      : isDeepSeek
-      ? accessStore.deepseekApiKey
-      : isChatGLM
-      ? accessStore.chatglmApiKey
-      : isSiliconFlow
-      ? accessStore.siliconflowApiKey
-      : isIflytek
-      ? accessStore.iflytekApiKey && accessStore.iflytekApiSecret
-        ? accessStore.iflytekApiKey + ":" + accessStore.iflytekApiSecret
-        : ""
-      : isAI302
-      ? accessStore.ai302ApiKey
-      : accessStore.openaiApiKey;
-    const finalApiKey = _overrideApiKey || matchedProvider?.apiKey || apiKey;
-    return {
-      isGoogle,
-      isAzure,
-      isAnthropic,
-      isBaidu,
-      isByteDance,
-      isAlibaba,
-      isMoonshot,
-      isIflytek,
-      isDeepSeek,
-      isXAI,
-      isChatGLM,
-      isSiliconFlow,
-      isAI302,
-      apiKey: finalApiKey,
-      isEnabledAccessControl,
-    };
-  }
-
-  function getAuthHeader(): string {
-    return isAzure
-      ? "api-key"
-      : isAnthropic
-      ? "x-api-key"
-      : isGoogle
-      ? "x-goog-api-key"
-      : "Authorization";
-  }
-
-  const {
-    isGoogle,
-    isAzure,
-    isAnthropic,
-    isBaidu,
-    isByteDance,
-    isAlibaba,
-    isMoonshot,
-    isIflytek,
-    isDeepSeek,
-    isXAI,
-    isChatGLM,
-    isSiliconFlow,
-    isAI302,
-    apiKey,
-    isEnabledAccessControl,
-  } = getConfig();
-  // when using baidu api in app, not set auth header
-  if (isBaidu && clientConfig?.isApp) return headers;
-
-  const authHeader = getAuthHeader();
-
-  const bearerToken = getBearerToken(
-    apiKey,
-    isAzure || isAnthropic || isGoogle,
-  );
-
-  if (bearerToken) {
-    headers[authHeader] = bearerToken;
-  } else if (isEnabledAccessControl && validString(accessStore.accessCode)) {
+  if (isEnabledAccessControl && validString(accessStore.accessCode)) {
     headers["Authorization"] = getBearerToken(
       ACCESS_CODE_PREFIX + accessStore.accessCode,
     );

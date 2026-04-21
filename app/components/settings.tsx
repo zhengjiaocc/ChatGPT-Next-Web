@@ -68,7 +68,7 @@ import { useSyncStore } from "../store/sync";
 import { nanoid } from "nanoid";
 import { useMaskStore } from "../store/mask";
 import { useProviderStore } from "../store/provider";
-import { ProviderType } from "../utils/cloud";
+ // 旧的 provider type 已删除
 import { TTSConfigList } from "./tts-config";
 import { RealtimeConfigList } from "./realtime-chat/realtime-config";
 
