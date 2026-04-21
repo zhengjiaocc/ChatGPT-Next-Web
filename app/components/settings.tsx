@@ -37,7 +37,6 @@ import {
   SubmitKey,
   useChatStore,
   Theme,
-  useUpdateStore,
   useAccessStore,
   useAppConfig,
 } from "../store";
@@ -336,21 +335,13 @@ export function Settings() {
   const config = useAppConfig();
   const updateConfig = config.update;
 
-  const updateStore = useUpdateStore();
-  const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const currentVersion = updateStore.formatVersion(updateStore.version);
-  const remoteId = updateStore.formatVersion(updateStore.remoteVersion);
-  const hasNewVersion = semverCompare(currentVersion, remoteId) === -1;
-  const updateUrl = getClientConfig()?.isApp ? RELEASE_URL : UPDATE_URL;
+  const currentVersion = "未知版本";
+  const remoteId = "未知版本";
+  const hasNewVersion = false;
+  const updateUrl = "";
 
   function checkUpdate(force = false) {
-    setCheckingUpdate(true);
-    updateStore.getLatestVersion(force).then(() => {
-      setCheckingUpdate(false);
-    });
-
-    console.log("[Update] local version ", updateStore.version);
-    console.log("[Update] remote version ", updateStore.remoteVersion);
+    // 检查更新已被完全剥离
   }
 
   const accessStore = useAccessStore();
@@ -369,8 +360,8 @@ export function Settings() {
   ]);
 
   const usage = {
-    used: updateStore.used,
-    subscription: updateStore.subscription,
+    used: 0,
+    subscription: 0,
   };
   const [loadingUsage, setLoadingUsage] = useState(false);
   function checkUsage(force = false) {
@@ -379,9 +370,9 @@ export function Settings() {
     }
 
     setLoadingUsage(true);
-    updateStore.updateUsage(force).finally(() => {
-      setLoadingUsage(false);
-    });
+    // updateStore.updateUsage(force).finally(() => {
+    setLoadingUsage(false);
+    // });
   }
 
   const promptStore = usePromptStore();

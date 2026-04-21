@@ -250,36 +250,8 @@ export const useAccessStore = createPersistStore(
       );
     },
     fetch() {
-      if (fetchState > 0 || getClientConfig()?.buildMode === "export") return;
-      fetchState = 1;
-      fetch("/api/config", {
-        method: "post",
-        body: null,
-        headers: {
-          ...getHeaders(),
-        },
-      })
-        .then((res) => res.json())
-        .then((res) => {
-          const defaultModel = res.defaultModel ?? "";
-          if (defaultModel !== "") {
-            const [model, providerName] = getModelProvider(defaultModel);
-            DEFAULT_CONFIG.modelConfig.model = model;
-            DEFAULT_CONFIG.modelConfig.providerName = providerName as any;
-          }
-
-          return res;
-        })
-        .then((res: DangerConfig) => {
-          console.log("[Config] got config from server", res);
-          set(() => ({ ...res }));
-        })
-        .catch(() => {
-          console.error("[Config] failed to fetch config");
-        })
-        .finally(() => {
-          fetchState = 2;
-        });
+      // 遗留自远古单机开源版的路由，已删除 /api/config 接口，这里置为空
+      return;
     },
   }),
   {
