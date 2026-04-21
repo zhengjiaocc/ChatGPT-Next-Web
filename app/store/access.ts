@@ -11,17 +11,12 @@ let fetchState = 0; // 0 not fetch, 1 fetching, 2 done
 const isApp = getClientConfig()?.buildMode === "export";
 
 const DEFAULT_ACCESS_STATE = {
-  accessCode: "",
   useCustomConfig: false,
 
   provider: ServiceProvider.OpenAI,
 
   // server config
-  needCode: true,
-  hideUserApiKey: false,
   hideBalanceQuery: false,
-  disableGPT4: false,
-  disableFastLink: false,
   customModels: "",
   defaultModel: "",
   visionModels: "",
@@ -34,10 +29,7 @@ export const useAccessStore = createPersistStore(
   { ...DEFAULT_ACCESS_STATE },
 
   (set, get) => ({
-    enabledAccessControl() {
-      this.fetch();
-      return get().needCode;
-    },
+
     getVisionModels() {
       this.fetch();
       return get().visionModels;
@@ -47,12 +39,9 @@ export const useAccessStore = createPersistStore(
       return get().edgeTTSVoiceName;
     },
     isAuthorized() {
-      this.fetch();
-      // has token or has code or disabled access control
-      return (
-        !this.enabledAccessControl() ||
-        (this.enabledAccessControl() && ensure(get(), ["accessCode"]))
-      );
+      // 在新的纯 SaaS 架构中，能够进入核心路由页面的必然持有服务器下发的有效 JWT
+      // 此处原是用于兼顾验证“公共访问密码”，现已废弃该旧版安全机制，故恒定放行。
+      return true;
     },
     fetch() {
       // 遗留自远古单机开源版的路由，已删除 /api/config 接口，这里置为空

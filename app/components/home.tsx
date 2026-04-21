@@ -186,10 +186,7 @@ function Screen() {
   const navigate = useNavigate();
   const accessStore = useAccessStore();
   const userStore = useUserStore();
-  const accessCode = accessStore.accessCode;
-  const isArtifact = location.pathname.includes(Path.Artifacts);
   const isHome = location.pathname === Path.Home;
-  const isAuth = location.pathname === Path.Auth;
   const isLogin = location.pathname === Path.Login;
   const isSd = location.pathname === Path.Sd;
   const isSdNew = location.pathname === Path.SdNew;
@@ -203,15 +200,11 @@ function Screen() {
   }, []);
 
   useEffect(() => {
-    if (isLogin || isAuth || getClientConfig()?.isApp) return;
-    if (
-      !userStore.loggedIn &&
-      !accessStore.isAuthorized() &&
-      !accessCode.trim()
-    ) {
+    if (isLogin || getClientConfig()?.isApp) return;
+    if (!userStore.loggedIn) {
       navigate(Path.Login);
     }
-  }, [isAuth, isLogin, navigate, userStore.loggedIn, accessCode]);
+  }, [isLogin, navigate, userStore.loggedIn]);
 
   if (isArtifact) {
     return (
@@ -221,7 +214,6 @@ function Screen() {
     );
   }
   const renderContent = () => {
-    if (isAuth) return <AuthPage />;
     if (isSd) return <Sd />;
     if (isSdNew) return <Sd />;
     return (

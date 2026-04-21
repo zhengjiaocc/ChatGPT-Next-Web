@@ -1,6 +1,5 @@
 import { getClientConfig } from "../config/client";
 import {
-  ACCESS_CODE_PREFIX,
   ModelProvider,
   ServiceProvider,
 } from "../constant";
@@ -226,15 +225,8 @@ export function getHeaders(
     };
   }
 
-  // 服务端管控网关架构：前端绝不负责组装外部提供商(OpenAI等)鉴权秘钥。
-  // 一切请求仅透传站点通过本地鉴权(JWT/AccessCode)核验的票据。
-  const isEnabledAccessControl = accessStore.enabledAccessControl();
-
-  if (isEnabledAccessControl && validString(accessStore.accessCode)) {
-    headers["Authorization"] = getBearerToken(
-      ACCESS_CODE_PREFIX + accessStore.accessCode,
-    );
-  }
+  // 核心认证现由 middleware.ts 在服务端统管 (JWT Cookie)，这里不再向后端上报任何多余的 Authorization
+  // 任何前端自行携带的密码标记都将被视为冗余。
 
   return headers;
 }
