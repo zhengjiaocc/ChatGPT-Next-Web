@@ -33,7 +33,7 @@ import {
 import Locale, { getLang } from "../locales";
 import { prettyObject } from "../utils/format";
 import { createPersistStore } from "../utils/store";
-import { estimateTokenLength } from "../utils/token";
+import { estimateTokenLength, getAvailableContextTokens } from "../utils/token";
 import { ModelConfig, ModelType, useAppConfig } from "./config";
 import { useAccessStore } from "./access";
 import { collectModelsWithDefaultModel } from "../utils/model";
@@ -818,7 +818,11 @@ export const useChatStore = createPersistStore(
           : shortTermMemoryStartIndex;
         // and if user has cleared history messages, we should exclude the memory too.
         const contextStartIndex = Math.max(clearContextIndex, memoryStartIndex);
-        const maxTokenThreshold = modelConfig.max_tokens;
+        // 使用模型实际的输入窗口容量（而非 max_tokens 输出限制）作为截断阈值
+        const maxTokenThreshold = getAvailableContextTokens(
+          modelConfig.model,
+          modelConfig.max_tokens,
+        );
 
         // get recent messages as much as possible
         const reversedRecentMessages = [];
