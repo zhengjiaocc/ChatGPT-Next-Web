@@ -1,4 +1,4 @@
-import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import React, { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./home.module.scss";
 
@@ -135,7 +135,9 @@ export function useDragSideBar() {
   const shouldNarrow =
     !isMobileScreen && config.sidebarWidth < MIN_SIDEBAR_WIDTH;
 
-  useEffect(() => {
+  // 用 useLayoutEffect 代替 useEffect：在 DOM 提交后、浏览器绘制前同步执行
+  // 确保 --sidebar-width 在首帧绘制前已设置，消除侧边栏宽度闪烁
+  useLayoutEffect(() => {
     const barWidth = shouldNarrow
       ? NARROW_SIDEBAR_WIDTH
       : limit(config.sidebarWidth ?? DEFAULT_SIDEBAR_WIDTH);

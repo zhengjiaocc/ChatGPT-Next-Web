@@ -239,7 +239,6 @@ function Screen() {
   };
 
   if (isLogin) return <LoginPage />;
-
   return (
     <div
       className={clsx(styles.container, {
@@ -312,20 +311,21 @@ export function Home() {
           "ms",
         );
 
-        if (cancelled) return;
-        const chatStart = performance.now();
-        await useChatStore.getState().loadFromDB();
-        const chatLoadedAt = performance.now();
-        console.debug(
-          "[Init] chat sessions loaded in",
-          Math.round(chatLoadedAt - chatStart),
-          "ms",
-        );
-        console.debug(
-          "[Init] total ready in",
-          Math.round(chatLoadedAt - totalStart),
-          "ms",
-        );
+        if (!cancelled) {
+          const chatStart = performance.now();
+          await useChatStore.getState().loadFromDB();
+          const chatLoadedAt = performance.now();
+          console.debug(
+            "[Init] chat sessions loaded in",
+            Math.round(chatLoadedAt - chatStart),
+            "ms",
+          );
+          console.debug(
+            "[Init] total ready in",
+            Math.round(chatLoadedAt - totalStart),
+            "ms",
+          );
+        }
       } catch (e) {
         console.error("[Home] failed to initialize user data", e);
         useChatStore.setState({ dbLoaded: true, dbLoadState: "error" });

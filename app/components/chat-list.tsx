@@ -115,7 +115,38 @@ export function ChatList(props: { narrow?: boolean }) {
   const navigate = useNavigate();
   const isMobileScreen = useMobileScreen();
 
-  if (!chatStore.dbLoaded) return null;
+  // sessions 由 IndexedDB 异步加载，首次渲染时为初始默认值（始终是 1），无法用作骨架数量
+  // 按照每条 item 实际占用高度（56px + 11px margin + 4px border = 71px）推算可见数量
+  // 减 1 是为避免最后一条因边框/padding 被裁切成半个
+  const ITEM_HEIGHT = 71;
+  const sidebarBodyHeight =
+    typeof window !== "undefined" ? window.innerHeight - 250 : 400;
+  const skeletonCount = Math.max(3, Math.floor(sidebarBodyHeight / ITEM_HEIGHT) - 1);
+
+  if (!chatStore.dbLoaded) {
+    return (
+      <div className={styles["chat-list"]}>
+        {Array.from({ length: skeletonCount }).map((_, i) => (
+          <div key={i} className={styles["chat-item"]}>
+            {/* 直接复用真实 CSS 类，让浏览器用相同字号、行高撑起骨架高度 */}
+            <div
+              className={`${styles["chat-item-title"]} ${styles["skeleton-item"]}`}
+              style={{ color: "transparent", borderRadius: "4px", width: i % 2 === 0 ? "75%" : "55%" }}
+            >
+              {"\u200b"}{/* 零宽字符，撑开行高 */}
+            </div>
+            <div
+              className={`${styles["chat-item-info"]} ${styles["skeleton-item"]}`}
+              style={{ color: "transparent", borderRadius: "4px", width: "45%" }}
+            >
+              {"\u200b"}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
 
   const onDragEnd: OnDragEndResponder = (result) => {
     const { destination, source } = result;
