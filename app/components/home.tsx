@@ -342,7 +342,9 @@ export function Home() {
   const configHydrated = useAppConfig((state) => state._hasHydrated);
 
   if (!configHydrated) {
-    return <Loading />;
+    // 拦截水合的几毫秒期间，切勿渲染 <Loading /> (会引发带 no-dark 的刺眼白屏闪光弹)
+    // 而是输出纯空，让其静默度过配置拉取，接着瞬间带着完全正确的深浅主题/宽度绘制页面首帧
+    return null;
   }
 
   return (
