@@ -1,4 +1,4 @@
-import { TTSConfig, TTSConfigValidator } from "../store";
+import { TTSConfig, TTSConfigValidator, useProviderStore } from "../store";
 
 import Locale from "../locales";
 import { ListItem, Select } from "./ui-lib";
@@ -14,6 +14,9 @@ export function TTSConfigList(props: {
   ttsConfig: TTSConfig;
   updateConfig: (updater: (config: TTSConfig) => void) => void;
 }) {
+  const providerStore = useProviderStore();
+  const enabledProviders = providerStore.providers.filter((p) => p.enabled);
+
   return (
     <>
       <ListItem
@@ -63,6 +66,29 @@ export function TTSConfigList(props: {
           ))}
         </Select>
       </ListItem>
+
+      {props.ttsConfig.engine === DEFAULT_TTS_ENGINE && (
+        <ListItem title="语音供应商" subTitle="选择提供 TTS 接口的供应商">
+          <Select
+            value={props.ttsConfig.providerId}
+            onChange={(e) => {
+              props.updateConfig(
+                (config) => (config.providerId = e.currentTarget.value),
+              );
+            }}
+          >
+            <option value="" key="default">
+              自动选择（使用首个可用供应商）
+            </option>
+            {enabledProviders.map((v) => (
+              <option value={v.id} key={v.id}>
+                {v.label}
+              </option>
+            ))}
+          </Select>
+        </ListItem>
+      )}
+
       {props.ttsConfig.engine === DEFAULT_TTS_ENGINE && (
         <>
           <ListItem title={Locale.Settings.TTS.Model}>

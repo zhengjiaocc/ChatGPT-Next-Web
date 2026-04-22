@@ -121,6 +121,7 @@ import { useProviderStore } from "../store/provider";
 import { ClientApi, MultimodalContent } from "../client/api";
 import { createTTSPlayer } from "../utils/audio";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "../utils/ms_edge_tts";
+import { ProviderStoreApi } from "../client/platforms/provider";
 
 import { isEmpty } from "lodash-es";
 import { getModelProvider } from "../utils/model";
@@ -1357,41 +1358,66 @@ function _Chat() {
       ttsPlayer.stop();
       setSpeechStatus(false);
     } else {
-      var api: ClientApi;
-      api = new ClientApi(ModelProvider.GPT);
       const config = useAppConfig.getState();
+      const providerStore = useProviderStore.getState();
+
       setSpeechLoading(true);
       ttsPlayer.init();
       let audioBuffer: ArrayBuffer;
       const { markdownToTxt } = require("markdown-to-txt");
       const textContent = markdownToTxt(text);
-      if (config.ttsConfig.engine !== DEFAULT_TTS_ENGINE) {
-        const edgeVoiceName = accessStore.edgeVoiceName();
-        const tts = new MsEdgeTTS();
-        await tts.setMetadata(
-          edgeVoiceName,
-          OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3,
-        );
-        audioBuffer = await tts.toArrayBuffer(textContent);
-      } else {
-        audioBuffer = await api.llm.speech({
-          model: config.ttsConfig.model,
-          input: textContent,
-          voice: config.ttsConfig.voice,
-          speed: config.ttsConfig.speed,
-        });
-      }
-      setSpeechStatus(true);
-      ttsPlayer
-        .play(audioBuffer, () => {
-          setSpeechStatus(false);
-        })
-        .catch((e) => {
-          console.error("[OpenAI Speech]", e);
+
+      try {
+        if (config.ttsConfig.engine !== DEFAULT_TTS_ENGINE) {
+          const edgeVoiceName = accessStore.edgeVoiceName();
+          const tts = new MsEdgeTTS();
+          await tts.setMetadata(
+            edgeVoiceName,
+            OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3,
+          );
+          audioBuffer = await tts.toArrayBuffer(textContent);
+        } else {
+          // 查找指定的供应商，或默认使用首个已启用的供应商
+          const ttsProvider =
+            providerStore.providers.find(
+              (p) => p.id === config.ttsConfig.providerId && p.enabled,
+            ) ?? providerStore.providers.find((p) => p.enabled);
+
+          if (!ttsProvider) {
+            throw new Error("请先在设置中配置并启用至少一个供应商");
+          }
+
+          const api = new ProviderStoreApi(ttsProvider);
+          audioBuffer = await api.speech({
+            model: config.ttsConfig.model,
+            input: textContent,
+            voice: config.ttsConfig.voice,
+            speed: config.ttsConfig.speed,
+          });
+        }
+
+        setSpeechStatus(true);
+        ttsPlayer
+          .play(audioBuffer, () => {
+            setSpeechStatus(false);
+          })
+          .catch((e) => {
+            console.error("[OpenAI Speech Playback]", e);
+            showToast(prettyObject(e));
+            setSpeechStatus(false);
+          });
+      } catch (e: any) {
+        console.error("[OpenAI Speech]", e);
+        const errorMsg = e?.toString() ?? "";
+        if (errorMsg.includes("Connect Error")) {
+          showToast("Edge TTS 连接失败：可能是浏览器隐私保护拦截。建议在设置中切换为供应商 TTS 引擎。");
+        } else {
           showToast(prettyObject(e));
-          setSpeechStatus(false);
-        })
-        .finally(() => setSpeechLoading(false));
+        }
+        setSpeechStatus(false);
+      } finally {
+        setSpeechLoading(false);
+      }
     }
   }
 
