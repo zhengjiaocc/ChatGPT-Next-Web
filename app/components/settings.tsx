@@ -796,6 +796,7 @@ export function Settings() {
           <div className="modal-mask">
             <Modal
               title="模型提供商"
+              defaultMax={true}
               onClose={() => setShowProviderModal(false)}
             >
               <ProviderConfig />
