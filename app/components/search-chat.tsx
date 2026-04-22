@@ -31,10 +31,12 @@ export function SearchChatPage() {
       const lower = text.toLowerCase();
       const results: Item[] = [];
       sessions.forEach((session, index) => {
+        if (session.messagesLoaded === false) return;
         const matches: string[] = [];
         session.messages.forEach((message) => {
-          const content = message.content as string;
-          if (!content?.toLowerCase || content === "") return;
+          const content =
+            typeof message.content === "string" ? message.content : "";
+          if (!content) return;
           const lc = content.toLowerCase();
           let pos = lc.indexOf(lower);
           while (pos !== -1) {
@@ -66,7 +68,7 @@ export function SearchChatPage() {
             <div className="window-header-main-title">
               {Locale.SearchChat.Page.Title}
             </div>
-            <div className="window-header-submai-title">
+            <div className="window-header-sub-title">
               {Locale.SearchChat.Page.SubTitle(searchResults.length)}
             </div>
           </div>
