@@ -285,53 +285,6 @@ export const useAppConfig = createPersistStore(
     migrate(persistedState, version) {
       const state = persistedState as ChatConfig;
 
-      if (version < 3.4) {
-        state.modelConfig.sendMemory = true;
-        state.modelConfig.historyMessageCount = 4;
-        state.modelConfig.compressMessageLengthThreshold = 1000;
-        state.modelConfig.frequency_penalty = 0;
-        state.modelConfig.top_p = 1;
-        state.modelConfig.template = DEFAULT_INPUT_TEMPLATE;
-        state.dontShowMaskSplashScreen = false;
-        state.hideBuiltinMasks = false;
-      }
-
-      if (version < 3.5) {
-        state.customModels = "claude,claude-100k";
-      }
-
-      if (version < 3.6) {
-        state.modelConfig.enableInjectSystemPrompts = true;
-      }
-
-      if (version < 3.7) {
-        state.enableAutoGenerateTitle = true;
-      }
-
-      if (version < 3.8) {
-        state.lastUpdate = Date.now();
-      }
-
-      if (version < 3.9) {
-        state.modelConfig.template =
-          state.modelConfig.template !== DEFAULT_INPUT_TEMPLATE
-            ? state.modelConfig.template
-            : config?.template ?? DEFAULT_INPUT_TEMPLATE;
-      }
-
-      if (version < 4.1) {
-        state.modelConfig.compressModel =
-          DEFAULT_CONFIG.modelConfig.compressModel;
-        state.modelConfig.compressProviderName =
-          DEFAULT_CONFIG.modelConfig.compressProviderName;
-      }
-
-      if (version < 4.2) {
-        state.modelConfig.historyMessageCount = 16;
-        state.modelConfig.compressMessageLengthThreshold = 32000;
-        state.modelConfig.max_tokens = 8192;
-      }
-
       if (version < 4.5) {
         // 彻底清空所有旧缓存模型名，强制用户重新从供应商列表中选择
         state.modelConfig.model = "" as ModelType;

@@ -592,9 +592,10 @@ export function ChatActions(props: {
       props.setUploading(false);
     }
 
-    // if current model is not available
-    // switch to first available model
-    const isUnavailableModel = !models.some((m) => m.name === currentModel);
+    // 仅当 currentModel 非空时才判断"不可用"
+    // 空字符串是用户尚未选择模型的状态，不应自动切换
+    const isUnavailableModel =
+      currentModel !== "" && !models.some((m) => m.name === currentModel);
     if (isUnavailableModel && models.length > 0 && chatStore.dbLoaded) {
       // show next model to default model if exist
       let nextModel = models.find((model) => model.isDefault) || models[0];
