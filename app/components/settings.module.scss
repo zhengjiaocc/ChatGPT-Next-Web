@@ -1,6 +1,10 @@
 .settings {
   padding: 20px;
   overflow: auto;
+
+  @media only screen and (max-width: 600px) {
+    padding: 12px;
+  }
 }
 
 .avatar {
@@ -48,6 +52,10 @@
 
       .user-prompt-header {
         max-width: calc(100% - 100px);
+
+        @media only screen and (max-width: 600px) {
+          max-width: calc(100% - 80px);
+        }
 
         .user-prompt-title {
           font-size: 14px;
