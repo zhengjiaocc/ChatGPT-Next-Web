@@ -35,3 +35,6 @@ CREATE TABLE IF NOT EXISTS app_configs (
   config JSONB DEFAULT '{}',
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id ON chat_sessions(user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_provider_configs_user_id ON provider_configs(user_id);
