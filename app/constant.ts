@@ -423,9 +423,9 @@ You are an AI assistant with access to system tools. Your role is to help users 
    
 `;
 
-export const SUMMARIZE_MODEL = "deepseek-chat";
-export const GEMINI_SUMMARIZE_MODEL = "gemini-pro";
-export const DEEPSEEK_SUMMARIZE_MODEL = "deepseek-chat";
+// export const SUMMARIZE_MODEL = "deepseek-chat";
+// export const GEMINI_SUMMARIZE_MODEL = "gemini-pro";
+// export const DEEPSEEK_SUMMARIZE_MODEL = "deepseek-chat";
 
 export const KnowledgeCutOffDate: Record<string, string> = {
   default: "2021-09",
@@ -749,7 +749,7 @@ let seq = 1000; // 内置的模型序号生成器从1000开始
 export const DEFAULT_MODELS = [
   ...openaiModels.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++, // Global sequence sort(index)
     provider: {
       id: "openai",
@@ -760,7 +760,7 @@ export const DEFAULT_MODELS = [
   })),
   ...openaiModels.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "azure",
@@ -771,7 +771,7 @@ export const DEFAULT_MODELS = [
   })),
   ...googleModels.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "google",
@@ -782,7 +782,7 @@ export const DEFAULT_MODELS = [
   })),
   ...anthropicModels.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "anthropic",
@@ -793,7 +793,7 @@ export const DEFAULT_MODELS = [
   })),
   ...baiduModels.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "baidu",
@@ -804,7 +804,7 @@ export const DEFAULT_MODELS = [
   })),
   ...bytedanceModels.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "bytedance",
@@ -815,7 +815,7 @@ export const DEFAULT_MODELS = [
   })),
   ...alibabaModes.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "alibaba",
@@ -826,7 +826,7 @@ export const DEFAULT_MODELS = [
   })),
   ...tencentModels.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "tencent",
@@ -837,7 +837,7 @@ export const DEFAULT_MODELS = [
   })),
   ...moonshotModels.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "moonshot",
@@ -848,7 +848,7 @@ export const DEFAULT_MODELS = [
   })),
   ...iflytekModels.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "iflytek",
@@ -859,7 +859,7 @@ export const DEFAULT_MODELS = [
   })),
   ...xAIModes.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "xai",
@@ -870,7 +870,7 @@ export const DEFAULT_MODELS = [
   })),
   ...chatglmModels.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "chatglm",
@@ -881,7 +881,7 @@ export const DEFAULT_MODELS = [
   })),
   ...deepseekModels.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "deepseek",
@@ -892,7 +892,7 @@ export const DEFAULT_MODELS = [
   })),
   ...siliconflowModels.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "siliconflow",
@@ -903,7 +903,7 @@ export const DEFAULT_MODELS = [
   })),
   ...ai302Models.map((name) => ({
     name,
-    available: true,
+    available: false,
     sorted: seq++,
     provider: {
       id: "ai302",
