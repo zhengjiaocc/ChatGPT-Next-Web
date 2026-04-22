@@ -120,7 +120,18 @@ export class MsEdgeTTS {
   static OUTPUT_FORMAT = OUTPUT_FORMAT;
   private static TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
   private static VOICES_URL = `https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=${MsEdgeTTS.TRUSTED_CLIENT_TOKEN}`;
-  private static SYNTH_URL = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${MsEdgeTTS.TRUSTED_CLIENT_TOKEN}`;
+  private static getSynthUrl() {
+    const uuid = () => {
+      return "xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+        const r = (Math.random() * 16) | 0,
+          v = c == "x" ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+    };
+    return `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${
+      MsEdgeTTS.TRUSTED_CLIENT_TOKEN
+    }&ConnectionId=${uuid()}`;
+  }
   private static BINARY_DELIM = "Path:audio\r\n";
   private static VOICE_LANG_REGEX = /\w{2}-\w{2}/;
   private readonly _enableLogger;
@@ -159,7 +170,7 @@ export class MsEdgeTTS {
   }
 
   private _initClient() {
-    this._ws = new WebSocket(MsEdgeTTS.SYNTH_URL);
+    this._ws = new WebSocket(MsEdgeTTS.getSynthUrl());
 
     this._ws.binaryType = "arraybuffer";
     return new Promise((resolve, reject) => {
