@@ -1,6 +1,4 @@
-import md5 from "spark-md5";
-import { DEFAULT_MODELS, DEFAULT_GA_ID } from "../constant";
-import { isGPT4Model } from "../utils/model";
+import { DEFAULT_GA_ID } from "../constant";
 
 declare global {
   namespace NodeJS {
@@ -141,15 +139,7 @@ export const getServerSideConfig = () => {
   let defaultModel = process.env.DEFAULT_MODEL ?? "";
   let visionModels = process.env.VISION_MODELS ?? "";
 
-  if (disableGPT4) {
-    if (customModels) customModels += ",";
-    customModels += DEFAULT_MODELS.filter((m) => isGPT4Model(m.name))
-      .map((m) => "-" + m.name)
-      .join(",");
-    if (defaultModel && isGPT4Model(defaultModel)) {
-      defaultModel = "";
-    }
-  }
+  // DISABLE_GPT4 现已无效（DEFAULT_MODELS 为空，模型列表全部来自供应商配置）
 
   const isStability = !!process.env.STABILITY_API_KEY;
 
