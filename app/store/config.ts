@@ -22,7 +22,8 @@ function isLoggedIn() {
   return useUserStore.getState().loggedIn;
 }
 
-export type ModelType = (typeof DEFAULT_MODELS)[number]["name"];
+// DEFAULT_MODELS 为空数组，类型不再从中推导，直接用 string
+export type ModelType = string;
 export type TTSModelType = (typeof DEFAULT_TTS_MODELS)[number];
 export type TTSVoiceType = (typeof DEFAULT_TTS_VOICES)[number];
 export type TTSEngineType = (typeof DEFAULT_TTS_ENGINES)[number];
