@@ -373,7 +373,7 @@ export function SideBar(props: { className?: string }) {
           </>
         }
         secondaryAction={
-          {hasEnabledProvider && (
+          hasEnabledProvider && (
             <IconButton
               icon={<AddIcon />}
               text={shouldNarrow ? undefined : Locale.Home.NewChat}
@@ -387,7 +387,7 @@ export function SideBar(props: { className?: string }) {
               }}
               shadow
             />
-          )}
+          )
         }
       />
     </SideBarContainer>
