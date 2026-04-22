@@ -35,32 +35,8 @@ export class ProviderStoreApi implements LLMApi {
     return res.choices?.at(0)?.message?.content ?? "";
   }
 
-  async speech(options: SpeechOptions): Promise<ArrayBuffer> {
-    const chatPath = this.path(OpenaiPath.SpeechPath);
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${this.provider.apiKey}`,
-    };
-
-    const requestPayload = {
-      model: options.model,
-      input: options.input,
-      voice: options.voice,
-      speed: options.speed,
-    };
-
-    const res = await fetch(chatPath, {
-      method: "POST",
-      body: JSON.stringify(requestPayload),
-      headers,
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`TTS Request failed: ${res.status} ${errorText}`);
-    }
-
-    return await res.arrayBuffer();
+  speech(_options: SpeechOptions): Promise<ArrayBuffer> {
+    throw new Error("Not supported");
   }
 
   async chat(options: ChatOptions) {

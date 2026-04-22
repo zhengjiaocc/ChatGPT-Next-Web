@@ -69,7 +69,7 @@ import { nanoid } from "nanoid";
 import { useMaskStore } from "../store/mask";
 import { useProviderStore } from "../store/provider";
  // 旧的 provider type 已删除
-import { TTSConfigList } from "./tts-config";
+
 import { RealtimeConfigList } from "./realtime-chat/realtime-config";
 
 function EditPromptModal(props: { id: string; onClose: () => void }) {
@@ -819,16 +819,7 @@ export function Settings() {
             }}
           />
         </List>
-        <List>
-          <TTSConfigList
-            ttsConfig={config.ttsConfig}
-            updateConfig={(updater) => {
-              const ttsConfig = { ...config.ttsConfig };
-              updater(ttsConfig);
-              config.update((config) => (config.ttsConfig = ttsConfig));
-            }}
-          />
-        </List>
+
 
         <DangerItems />
 
