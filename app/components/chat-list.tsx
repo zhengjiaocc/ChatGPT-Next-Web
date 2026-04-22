@@ -120,8 +120,13 @@ export function ChatList(props: { narrow?: boolean }) {
   // 普通模式下 ≈ 71px（含 padding/border）
   const ITEM_HEIGHT = props.narrow ? 61 : 71;
   const sidebarBodyHeight =
-    typeof window !== "undefined" ? window.innerHeight - 250 : 400;
-  const skeletonCount = Math.max(3, Math.floor(sidebarBodyHeight / ITEM_HEIGHT) - 1);
+    typeof window !== "undefined"
+      ? window.innerHeight - (isMobileScreen ? 200 : 250)
+      : 400;
+  const skeletonCount = Math.max(
+    3,
+    Math.floor(sidebarBodyHeight / ITEM_HEIGHT),
+  );
 
   if (!chatStore.dbLoaded) {
     return (
@@ -135,7 +140,7 @@ export function ChatList(props: { narrow?: boolean }) {
                   className={`${styles["chat-item-avatar"]} ${styles["skeleton-item"]}`}
                   style={{ color: "transparent", backgroundSize: "cover" }}
                 >
-                   {"\u200b"}
+                  {"\u200b"}
                 </div>
               </div>
             </div>
@@ -144,23 +149,30 @@ export function ChatList(props: { narrow?: boolean }) {
             <div key={i} className={styles["chat-item"]}>
               <div
                 className={`${styles["chat-item-title"]} ${styles["skeleton-item"]}`}
-                style={{ color: "transparent", borderRadius: "4px", width: i % 2 === 0 ? "75%" : "55%" }}
+                style={{
+                  color: "transparent",
+                  borderRadius: "4px",
+                  width: i % 2 === 0 ? "75%" : "55%",
+                }}
               >
                 {"\u200b"}
               </div>
               <div
                 className={`${styles["chat-item-info"]} ${styles["skeleton-item"]}`}
-                style={{ color: "transparent", borderRadius: "4px", width: "45%" }}
+                style={{
+                  color: "transparent",
+                  borderRadius: "4px",
+                  width: "45%",
+                }}
               >
                 {"\u200b"}
               </div>
             </div>
-          )
+          ),
         )}
       </div>
     );
   }
-
 
   const onDragEnd: OnDragEndResponder = (result) => {
     const { destination, source } = result;
