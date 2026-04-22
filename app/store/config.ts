@@ -259,7 +259,7 @@ export const useAppConfig = createPersistStore(
 
         // 如果清洗了脏数据，立即回写云端，保持云端也是干净状态
         if (needResync) {
-          get().syncToDB();
+          (get() as any).syncToDB();
         }
       }
     },
