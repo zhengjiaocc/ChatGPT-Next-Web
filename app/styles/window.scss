@@ -1,5 +1,5 @@
 .window-header {
-  padding: 8px 16px;
+  padding: 6px 14px;
   border-bottom: rgba(0, 0, 0, 0.1) 1px solid;
   position: relative;
 
@@ -8,7 +8,7 @@
   align-items: center;
 
   @media only screen and (max-width: 600px) {
-    padding: 6px 10px;
+    padding: 4px 10px;
   }
 }
 
@@ -17,7 +17,7 @@
   overflow: hidden;
 
   .window-header-main-title {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -26,15 +26,15 @@
     max-width: 50vw;
 
     @media only screen and (max-width: 600px) {
-      font-size: 15px;
+      font-size: 14px;
     }
   }
 
   .window-header-sub-title {
-    font-size: 14px;
+    font-size: 13px;
 
     @media only screen and (max-width: 600px) {
-      font-size: 12px;
+      font-size: 11px;
     }
   }
 }
