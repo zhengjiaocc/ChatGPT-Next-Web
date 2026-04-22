@@ -38,16 +38,23 @@ export function ModelConfigList(props: {
 
   const value = `${props.modelConfig.model}@${props.modelConfig?.providerName}`;
   const compressValue = `${props.modelConfig.compressModel}@${props.modelConfig?.compressProviderName}`;
+  const hasNoModels = availableModels.length === 0;
+
   const currentModelName =
     availableModels.find(
       (m) => `${m.name}@${m.provider?.providerName}` === value,
-    )?.displayName ?? props.modelConfig.model;
+    )?.displayName ??
+    (hasNoModels ? "请先配置供应商" : props.modelConfig.model || "请选择模型");
+
   const currentCompressName =
     availableModels.find(
       (m) => `${m.name}@${m.provider?.providerName}` === compressValue,
     )?.displayName ||
-    props.modelConfig.compressModel ||
-    Locale.Settings.CompressModel.Title;
+    (props.modelConfig.compressModel && !hasNoModels
+      ? props.modelConfig.compressModel
+      : hasNoModels
+        ? "请先配置供应商"
+        : Locale.Settings.CompressModel.Title);
 
   return (
     <>
@@ -55,7 +62,9 @@ export function ModelConfigList(props: {
         <IconButton
           bordered
           text={currentModelName}
-          onClick={() => setShowModelSelector(true)}
+          onClick={() => !hasNoModels && setShowModelSelector(true)}
+          type={hasNoModels ? undefined : undefined}
+          style={hasNoModels ? { opacity: 0.5, cursor: "not-allowed" } : {}}
         />
       </ListItem>
       {showModelSelector && (
@@ -274,7 +283,8 @@ export function ModelConfigList(props: {
         <IconButton
           bordered
           text={currentCompressName}
-          onClick={() => setShowCompressSelector(true)}
+          onClick={() => !hasNoModels && setShowCompressSelector(true)}
+          style={hasNoModels ? { opacity: 0.5, cursor: "not-allowed" } : {}}
         />
       </ListItem>
       {showCompressSelector && (

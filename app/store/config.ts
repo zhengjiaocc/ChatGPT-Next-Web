@@ -239,7 +239,7 @@ export const useAppConfig = createPersistStore(
   }),
   {
     name: StoreKey.Config,
-    version: 4.4,
+    version: 4.5,
 
     merge(persistedState, currentState) {
       const state = persistedState as ChatConfig | undefined;
@@ -317,6 +317,16 @@ export const useAppConfig = createPersistStore(
           state.modelConfig.model = "" as ModelType;
           state.modelConfig.providerName = "" as ServiceProvider;
         }
+      }
+
+      if (version < 4.5) {
+        // 彻底清空所有旧缓存模型名，强制用户重新从供应商列表中选择
+        state.modelConfig.model = "" as ModelType;
+        state.modelConfig.providerName = "" as ServiceProvider;
+        state.modelConfig.providerId = "";
+        state.modelConfig.compressModel = "";
+        state.modelConfig.compressProviderName = "" as ServiceProvider;
+        state.modelConfig.compressProviderId = "";
       }
 
       return state as any;
