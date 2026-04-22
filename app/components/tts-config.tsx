@@ -7,7 +7,6 @@ import {
   DEFAULT_TTS_ENGINE,
   DEFAULT_TTS_ENGINES,
   DEFAULT_TTS_MODELS,
-  DEFAULT_TTS_VOICES,
 } from "../constant";
 import { InputRange } from "./input-range";
 
@@ -105,28 +104,6 @@ export function TTSConfigList(props: {
               }}
             >
               {DEFAULT_TTS_MODELS.map((v, i) => (
-                <option value={v} key={i}>
-                  {v}
-                </option>
-              ))}
-            </Select>
-          </ListItem>
-          <ListItem
-            title={Locale.Settings.TTS.Voice.Title}
-            subTitle={Locale.Settings.TTS.Voice.SubTitle}
-          >
-            <Select
-              value={props.ttsConfig.voice}
-              onChange={(e) => {
-                props.updateConfig(
-                  (config) =>
-                    (config.voice = TTSConfigValidator.voice(
-                      e.currentTarget.value,
-                    )),
-                );
-              }}
-            >
-              {DEFAULT_TTS_VOICES.map((v, i) => (
                 <option value={v} key={i}>
                   {v}
                 </option>

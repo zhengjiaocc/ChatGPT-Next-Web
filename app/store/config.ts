@@ -8,7 +8,6 @@ import {
   DEFAULT_TTS_ENGINES,
   DEFAULT_TTS_MODEL,
   DEFAULT_TTS_MODELS,
-  DEFAULT_TTS_VOICES,
   StoreKey,
   ServiceProvider,
 } from "../constant";
@@ -23,7 +22,6 @@ function isLoggedIn() {
 // DEFAULT_MODELS 为空数组，类型不再从中推导，直接用 string
 export type ModelType = string;
 export type TTSModelType = (typeof DEFAULT_TTS_MODELS)[number];
-export type TTSVoiceType = (typeof DEFAULT_TTS_VOICES)[number];
 export type TTSEngineType = (typeof DEFAULT_TTS_ENGINES)[number];
 
 export enum SubmitKey {
@@ -137,9 +135,6 @@ export const TTSConfigValidator = {
   },
   model(x: string) {
     return x as TTSModelType;
-  },
-  voice(x: string) {
-    return x as TTSVoiceType;
   },
   speed(x: number) {
     return limitNumber(x, 0.25, 4.0, 1.0);
