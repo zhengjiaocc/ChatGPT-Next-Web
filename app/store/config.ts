@@ -69,8 +69,8 @@ export const DEFAULT_CONFIG = {
   models: DEFAULT_MODELS as any as LLMModel[],
 
   modelConfig: {
-    model: "gpt-4o-mini" as ModelType,
-    providerName: "OpenAI" as ServiceProvider,
+    model: "" as ModelType,
+    providerName: "" as ServiceProvider,
     providerId: "",
     temperature: 0.5,
     top_p: 1,
@@ -239,7 +239,7 @@ export const useAppConfig = createPersistStore(
   }),
   {
     name: StoreKey.Config,
-    version: 4.2,
+    version: 4.4,
 
     merge(persistedState, currentState) {
       const state = persistedState as ChatConfig | undefined;
@@ -303,6 +303,20 @@ export const useAppConfig = createPersistStore(
         state.modelConfig.historyMessageCount = 16;
         state.modelConfig.compressMessageLengthThreshold = 32000;
         state.modelConfig.max_tokens = 8192;
+      }
+
+      if (version < 4.3) {
+        if (state.modelConfig.model === "gpt-4o-mini") {
+          state.modelConfig.model = "deepseek-chat" as ModelType;
+          state.modelConfig.providerName = "DeepSeek" as ServiceProvider;
+        }
+      }
+
+      if (version < 4.4) {
+        if (state.modelConfig.model === "deepseek-chat" || state.modelConfig.model === "gpt-4o-mini") {
+          state.modelConfig.model = "" as ModelType;
+          state.modelConfig.providerName = "" as ServiceProvider;
+        }
       }
 
       return state as any;
