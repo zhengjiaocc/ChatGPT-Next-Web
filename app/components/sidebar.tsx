@@ -18,6 +18,7 @@ import Locale from "../locales";
 
 import { useAppConfig, useChatStore } from "../store";
 import { Theme } from "../store/config";
+import { useProviderStore } from "../store/provider";
 
 import {
   DEFAULT_SIDEBAR_WIDTH,
@@ -246,6 +247,8 @@ export function SideBar(props: { className?: string }) {
   const navigate = useNavigate();
   const config = useAppConfig();
   const chatStore = useChatStore();
+  const providerStore = useProviderStore();
+  const hasEnabledProvider = providerStore.providers.some((p) => p.enabled);
   const [mcpEnabled, setMcpEnabled] = useState(false);
 
   useEffect(() => {
@@ -271,19 +274,21 @@ export function SideBar(props: { className?: string }) {
         shouldNarrow={shouldNarrow}
       >
         <div className={styles["sidebar-header-bar"]}>
-          <IconButton
-            icon={<MaskIcon />}
-            text={shouldNarrow ? undefined : Locale.Mask.Name}
-            className={styles["sidebar-bar-button"]}
-            onClick={() => {
-              if (config.dontShowMaskSplashScreen !== true) {
-                navigate(Path.NewChat, { state: { fromHome: true } });
-              } else {
-                navigate(Path.Masks, { state: { fromHome: true } });
-              }
-            }}
-            shadow
-          />
+          {hasEnabledProvider && (
+            <IconButton
+              icon={<MaskIcon />}
+              text={shouldNarrow ? undefined : Locale.Mask.Name}
+              className={styles["sidebar-bar-button"]}
+              onClick={() => {
+                if (config.dontShowMaskSplashScreen !== true) {
+                  navigate(Path.NewChat, { state: { fromHome: true } });
+                } else {
+                  navigate(Path.Masks, { state: { fromHome: true } });
+                }
+              }}
+              shadow
+            />
+          )}
           {mcpEnabled && (
             <IconButton
               icon={<McpIcon />}
@@ -327,7 +332,7 @@ export function SideBar(props: { className?: string }) {
           }
         }}
       >
-        <ChatList narrow={shouldNarrow} />
+        {hasEnabledProvider && <ChatList narrow={shouldNarrow} />}
       </SideBarBody>
       <SideBarTail
         primaryAction={
@@ -368,19 +373,21 @@ export function SideBar(props: { className?: string }) {
           </>
         }
         secondaryAction={
-          <IconButton
-            icon={<AddIcon />}
-            text={shouldNarrow ? undefined : Locale.Home.NewChat}
-            onClick={() => {
-              if (config.dontShowMaskSplashScreen) {
-                chatStore.newSession();
-                navigate(Path.Chat);
-              } else {
-                navigate(Path.NewChat);
-              }
-            }}
-            shadow
-          />
+          {hasEnabledProvider && (
+            <IconButton
+              icon={<AddIcon />}
+              text={shouldNarrow ? undefined : Locale.Home.NewChat}
+              onClick={() => {
+                if (config.dontShowMaskSplashScreen) {
+                  chatStore.newSession();
+                  navigate(Path.Chat);
+                } else {
+                  navigate(Path.NewChat);
+                }
+              }}
+              shadow
+            />
+          )}
         }
       />
     </SideBarContainer>
