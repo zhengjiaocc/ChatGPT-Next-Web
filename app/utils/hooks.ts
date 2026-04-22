@@ -37,11 +37,8 @@ export function useAllModels() {
       );
     }
 
-    return collectModelsWithDefaultModel(
-      configStore.models,
-      [configStore.customModels, accessStore.customModels].join(","),
-      accessStore.defaultModel,
-    );
+    // 无供应商配置时返回空列表，强制用户去提供商设置中添加
+    return [];
   }, [
     accessStore.customModels,
     accessStore.defaultModel,

@@ -739,6 +739,21 @@ export function Settings() {
           </ListItem>
         </List>
 
+        {/* 模型提供商配置 */}
+        <List>
+          <ListItem
+            title="模型提供商"
+            subTitle="管理 API 供应商及其可用模型"
+          >
+            <IconButton
+              icon={<ConfigIcon />}
+              text="配置供应商"
+              onClick={() => setShowProviderModal(true)}
+              type="primary"
+            />
+          </ListItem>
+        </List>
+
         {/* 模型配置 */}
         <List id={SlotID.CustomModel}>
           {!shouldHideBalanceQuery && !clientConfig?.isApp ? (
@@ -776,6 +791,17 @@ export function Settings() {
             }}
           />
         </List>
+
+        {showProviderModal && (
+          <div className="modal-mask">
+            <Modal
+              title="模型提供商"
+              onClose={() => setShowProviderModal(false)}
+            >
+              <ProviderConfig />
+            </Modal>
+          </div>
+        )}
 
         {shouldShowPromptModal && (
           <UserPromptModal onClose={() => setShowPromptModal(false)} />
