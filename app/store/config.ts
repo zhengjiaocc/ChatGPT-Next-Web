@@ -234,7 +234,33 @@ export const useAppConfig = createPersistStore(
       if (config && Object.keys(config).length > 0) {
         // 从云端配置中剔除 sidebarWidth，侧边栏大小应留在本地，漫游会导致桌面端收起状态被别的设备宽状态强行冲掉而闪烁
         const { sidebarWidth, ...cloudConfig } = config;
+
+        // 对云端 modelConfig 做迁移清洗：
+        // 云端可能保存了已废弃的内置模型名（如 gpt-4o-mini / gpt-3.5-turbo）
+        // 这些模型已从系统中移除，必须在加载时清空，避免覆盖本地迁移结果
+        let needResync = false;
+        if (cloudConfig.modelConfig) {
+          const mc = cloudConfig.modelConfig;
+          // 简单规则：如果 providerId 为空但 model/compressModel 非空，
+          // 说明是旧版本写入的硬编码模型名，强制清空
+          if (!mc.providerId && mc.model) {
+            mc.model = "";
+            mc.providerName = "";
+            needResync = true;
+          }
+          if (!mc.compressProviderId && mc.compressModel) {
+            mc.compressModel = "";
+            mc.compressProviderName = "";
+            needResync = true;
+          }
+        }
+
         set((state) => ({ ...state, ...cloudConfig }));
+
+        // 如果清洗了脏数据，立即回写云端，保持云端也是干净状态
+        if (needResync) {
+          get().syncToDB();
+        }
       }
     },
   }),
