@@ -275,7 +275,8 @@ async function syncSessionPayloadToDB(
   return false;
 }
 
-async function flushSessionSyncQueue(sessionId: string) {
+async function flushSessionSyncQueue(sessionId: string, depth = 0) {
+  if (depth > 10) return;
   if (sessionSyncRunning.get(sessionId)) return;
   const payload = pendingSessionSyncPayload.get(sessionId);
   if (!payload) return;
@@ -287,7 +288,7 @@ async function flushSessionSyncQueue(sessionId: string) {
   } finally {
     sessionSyncRunning.set(sessionId, false);
     if (pendingSessionSyncPayload.has(sessionId)) {
-      void flushSessionSyncQueue(sessionId);
+      void flushSessionSyncQueue(sessionId, depth + 1);
     }
   }
 }
@@ -524,7 +525,6 @@ export const useChatStore = createPersistStore(
 
       onNewMessage(message: ChatMessage, targetSession: ChatSession) {
         get().updateTargetSession(targetSession, (session) => {
-          session.messages = session.messages.concat();
           session.lastUpdate = Date.now();
         });
 

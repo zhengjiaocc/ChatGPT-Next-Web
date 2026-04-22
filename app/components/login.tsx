@@ -19,6 +19,7 @@ export function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -36,6 +37,7 @@ export function LoginPage() {
     }
     setLoading(true);
     setError("");
+    setSuccess("");
     const res = await fetch(
       mode === "login" ? "/api/auth/login" : "/api/auth/register",
       {
@@ -54,7 +56,7 @@ export function LoginPage() {
     }
     if (mode === "register") {
       setMode("login");
-      setError("注册成功，请登录");
+      setSuccess("注册成功，请登录");
       setTurnstileToken("");
       turnstileRef.current?.reset();
       return;
@@ -101,15 +103,8 @@ export function LoginPage() {
           </span>
         </div>
 
-        {error && (
-          <div
-            className={
-              error === "注册成功，请登录" ? styles.success : styles.error
-            }
-          >
-            {error}
-          </div>
-        )}
+        {error && <div className={styles.error}>{error}</div>}
+        {success && <div className={styles.success}>{success}</div>}
 
         {TURNSTILE_SITE_KEY && (
           <Turnstile
@@ -136,6 +131,7 @@ export function LoginPage() {
           onClick={() => {
             setMode(mode === "login" ? "register" : "login");
             setError("");
+            setSuccess("");
           }}
         >
           {mode === "login" ? "没有账号？注册" : "已有账号？登录"}

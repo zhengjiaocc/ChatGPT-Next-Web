@@ -83,9 +83,14 @@ function ProviderDialog(props: {
           models = await discoverModels(type, apiKey, baseUrl);
           showToast(`发现 ${models.length} 个模型`);
         } catch {
-          showToast("自动发现失败，请手动添加模型或关闭模型发现");
-          setDiscovering(false);
-          return;
+          if (manualModels.length > 0) {
+            showToast("自动发现失败，使用已有模型保存");
+            models = manualModels;
+          } else {
+            showToast("自动发现失败，请手动添加模型或关闭模型发现");
+            setDiscovering(false);
+            return;
+          }
         }
       } else {
         if (manualModels.length === 0) {
