@@ -836,20 +836,19 @@ export function Settings() {
           <ListItem>
             <div className={styles["settings-license"]}>
               <div className={styles["settings-license-title"]}>
-                开源声明 / Open Source Licenses
+                开源声明 · Open Source
               </div>
               <div className={styles["settings-license-content"]}>
-                本项目基于 NoneChat 进行二次开发
+                本项目基于 ChatGPT-Next-Web 进行二次开发
                 <br />
-                Original Project: NoneChat · Copyright (c) 2023 Yidadaa · MIT
-                License
+                Copyright © 2023 Yidadaa · MIT License
                 <br />
                 <a
                   href="https://github.com/ChatGPTNextWeb/ChatGPT-Next-Web"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  https://github.com/ChatGPTNextWeb/ChatGPT-Next-Web
+                  github.com/ChatGPTNextWeb/ChatGPT-Next-Web
                 </a>
               </div>
             </div>

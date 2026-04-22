@@ -81,29 +81,36 @@
 
 .settings-license {
   width: 100%;
-  padding: 0;
+  padding: 4px 0 4px 14px;
+  border-left: 3px solid var(--primary);
+  opacity: 0.75;
+  transition: opacity 0.2s;
+
+  &:hover {
+    opacity: 1;
+  }
 
   .settings-license-title {
     font-size: 12px;
-    font-weight: normal;
-    margin-bottom: 8px;
+    font-weight: 600;
+    margin-bottom: 6px;
     color: var(--black);
-    opacity: 0.6;
+    letter-spacing: 0.03em;
   }
 
   .settings-license-content {
-    font-size: 11px;
-    line-height: 1.8;
+    font-size: 11.5px;
+    line-height: 1.9;
     color: var(--black);
-    opacity: 0.5;
+    opacity: 0.8;
 
     a {
-      color: inherit;
+      color: var(--primary);
       text-decoration: none;
       word-break: break-all;
 
       &:hover {
-        opacity: 0.8;
+        text-decoration: underline;
       }
     }
   }
