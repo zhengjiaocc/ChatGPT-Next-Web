@@ -1,3 +1,4 @@
+import md5 from "spark-md5";
 import { DEFAULT_GA_ID } from "../constant";
 
 declare global {
