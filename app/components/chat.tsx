@@ -2273,7 +2273,7 @@ export function Chat() {
           color: "var(--black)",
         }}
       >
-        <div style={{ width: 64, height: 64, opacity: 0.35 }}>
+        <div style={{ width: 120, height: 120, opacity: 0.25 }}>
           <ConnectionIcon />
         </div>
         <div>
