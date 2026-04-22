@@ -332,20 +332,6 @@ export const useAppConfig = createPersistStore(
         state.modelConfig.max_tokens = 8192;
       }
 
-      if (version < 4.3) {
-        if (state.modelConfig.model === "gpt-4o-mini") {
-          state.modelConfig.model = "deepseek-chat" as ModelType;
-          state.modelConfig.providerName = "DeepSeek" as ServiceProvider;
-        }
-      }
-
-      if (version < 4.4) {
-        if (state.modelConfig.model === "deepseek-chat" || state.modelConfig.model === "gpt-4o-mini") {
-          state.modelConfig.model = "" as ModelType;
-          state.modelConfig.providerName = "" as ServiceProvider;
-        }
-      }
-
       if (version < 4.5) {
         // 彻底清空所有旧缓存模型名，强制用户重新从供应商列表中选择
         state.modelConfig.model = "" as ModelType;
