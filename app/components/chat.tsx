@@ -2227,6 +2227,10 @@ function _Chat() {
 export function Chat() {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
+  const navigate = useNavigate();
+  const providerStore = useProviderStore();
+  const hasEnabledProvider = providerStore.providers.some((p) => p.enabled);
+
   if (chatStore.dbLoadState === "error") {
     return (
       <div
@@ -2251,5 +2255,45 @@ export function Chat() {
       </div>
     );
   }
+
+  // 未配置任何供应商时，显示引导页，避免用户陷入"空对话"困境
+  if (!hasEnabledProvider) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100%",
+          gap: 24,
+          padding: 40,
+          textAlign: "center",
+          color: "var(--black)",
+        }}
+      >
+        <div style={{ fontSize: 56, lineHeight: 1 }}>🔌</div>
+        <div>
+          <div
+            style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}
+          >
+            尚未配置模型供应商
+          </div>
+          <div
+            style={{ fontSize: 14, opacity: 0.6, maxWidth: 320, lineHeight: 1.6 }}
+          >
+            请先在设置中添加至少一个 API 供应商（如 OpenAI、DeepSeek 等），
+            系统将自动发现可用模型后即可开始对话。
+          </div>
+        </div>
+        <IconButton
+          text="前往配置供应商"
+          type="primary"
+          onClick={() => navigate(Path.Settings)}
+        />
+      </div>
+    );
+  }
+
   return <_Chat key={session.id}></_Chat>;
 }
