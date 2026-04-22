@@ -48,7 +48,6 @@ import PluginIcon from "../icons/plugin.svg";
 import ShortcutkeyIcon from "../icons/shortcutkey.svg";
 import McpToolIcon from "../icons/tool.svg";
 import HeadphoneIcon from "../icons/headphone.svg";
-import ConnectionIcon from "../icons/connection.svg";
 import {
   BOT_HELLO,
   ChatMessage,
@@ -2273,9 +2272,6 @@ export function Chat() {
           color: "var(--black)",
         }}
       >
-        <div style={{ width: 120, height: 120, opacity: 0.25 }}>
-          <ConnectionIcon />
-        </div>
         <div>
           <div
             style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}
