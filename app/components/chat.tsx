@@ -2278,11 +2278,8 @@ export function Chat() {
           >
             尚未配置模型供应商
           </div>
-          <div
-            style={{ fontSize: 14, opacity: 0.6, maxWidth: 320, lineHeight: 1.6 }}
-          >
-            请先在设置中添加至少一个 API 供应商（如 OpenAI、DeepSeek 等），
-            系统将自动发现可用模型后即可开始对话。
+          <div style={{ fontSize: 14, opacity: 0.6, lineHeight: 1.6 }}>
+            请先添加 API 供应商以开始对话
           </div>
         </div>
         <IconButton
