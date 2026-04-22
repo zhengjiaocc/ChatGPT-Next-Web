@@ -731,7 +731,7 @@ export const useChatStore = createPersistStore(
         const mcpEnabled = await isMcpEnabled();
         const mcpSystemPrompt = mcpEnabled ? await getMcpSystemPrompt() : "";
 
-        var systemPrompts: ChatMessage[] = [];
+        let systemPrompts: ChatMessage[] = [];
 
         if (shouldInjectSystemPrompts) {
           systemPrompts = [

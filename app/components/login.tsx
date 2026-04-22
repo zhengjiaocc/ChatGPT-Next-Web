@@ -8,6 +8,7 @@ import EyeIcon from "../icons/eye.svg";
 import EyeOffIcon from "../icons/eye-off.svg";
 import LoadingIcon from "../icons/three-dots.svg";
 import { useUserStore } from "../store/user";
+import { useProviderStore } from "../store/provider";
 import styles from "./login.module.scss";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
@@ -62,7 +63,8 @@ export function LoginPage() {
       return;
     }
     userStore.login(data.id, data.username);
-    navigate(Path.Chat);
+    const hasProviders = useProviderStore.getState().providers.length > 0;
+    navigate(hasProviders ? Path.Chat : Path.Settings);
   };
 
   return (

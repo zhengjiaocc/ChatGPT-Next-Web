@@ -201,8 +201,6 @@ export const useAppConfig = createPersistStore(
       }));
     },
 
-    allModels() {},
-
     async syncToDB() {
       if (!isLoggedIn()) return;
       const state = get();
