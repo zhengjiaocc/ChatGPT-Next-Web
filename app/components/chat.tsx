@@ -1282,25 +1282,7 @@ function _Chat() {
     }
   };
 
-  const deleteMessage = (msgId?: string) => {
-    chatStore.updateTargetSession(
-      session,
-      (session) =>
-        (session.messages = session.messages.filter((m) => m.id !== msgId)),
-    );
-  };
-
-  const onDelete = (msgId: string) => {
-    deleteMessage(msgId);
-  };
-
   const onResend = (message: ChatMessage) => {
-    // when it is resending a message
-    // 1. for a user's message, find the next bot response
-    // 2. for a bot's message, find the last user's input
-    // 3. delete original user input and bot's message
-    // 4. resend the user's input
-
     const resendingIndex = session.messages.findIndex(
       (m) => m.id === message.id,
     );
@@ -1311,36 +1293,32 @@ function _Chat() {
     }
 
     let userMessage: ChatMessage | undefined;
-    let botMessage: ChatMessage | undefined;
+    let userMessageIndex: number = -1;
 
     if (message.role === "assistant") {
       // if it is resending a bot's message, find the user input for it
-      botMessage = message;
       for (let i = resendingIndex; i >= 0; i -= 1) {
         if (session.messages[i].role === "user") {
           userMessage = session.messages[i];
+          userMessageIndex = i;
           break;
         }
       }
     } else if (message.role === "user") {
-      // if it is resending a user's input, find the bot's response
+      // if it is resending a user's input
       userMessage = message;
-      for (let i = resendingIndex; i < session.messages.length; i += 1) {
-        if (session.messages[i].role === "assistant") {
-          botMessage = session.messages[i];
-          break;
-        }
-      }
+      userMessageIndex = resendingIndex;
     }
 
-    if (userMessage === undefined) {
+    if (userMessage === undefined || userMessageIndex < 0) {
       console.error("[Chat] failed to resend", message);
       return;
     }
 
-    // delete the original messages
-    deleteMessage(userMessage.id);
-    deleteMessage(botMessage?.id);
+    // truncate the messages from the user message index
+    chatStore.updateTargetSession(session, (session) => {
+      session.messages.splice(userMessageIndex);
+    });
 
     // resend the message
     setIsLoading(true);
@@ -1974,14 +1952,6 @@ function _Chat() {
                                           text={Locale.Chat.Actions.Retry}
                                           icon={<ResetIcon />}
                                           onClick={() => onResend(message)}
-                                        />
-
-                                        <ChatAction
-                                          text={Locale.Chat.Actions.Delete}
-                                          icon={<DeleteIcon />}
-                                          onClick={() =>
-                                            onDelete(message.id ?? i)
-                                          }
                                         />
 
                                         <ChatAction
