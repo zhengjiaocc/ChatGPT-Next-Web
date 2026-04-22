@@ -1,4 +1,7 @@
-const ENC_KEY = process.env.ENCRYPTION_KEY ?? "";
+if (!process.env.ENCRYPTION_KEY) {
+  throw new Error("ENCRYPTION_KEY environment variable is required");
+}
+const ENC_KEY = process.env.ENCRYPTION_KEY;
 
 function hexToBytes(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
@@ -23,7 +26,6 @@ async function getKey(): Promise<CryptoKey> {
 }
 
 export async function encrypt(text: string): Promise<string> {
-  if (!ENC_KEY) return text;
   const key = await getKey();
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(text);
@@ -36,8 +38,10 @@ export async function encrypt(text: string): Promise<string> {
 }
 
 export async function decrypt(text: string): Promise<string> {
-  if (!ENC_KEY || !text.includes(":")) return text;
-  const [ivHex, dataHex] = text.split(":");
+  if (!text.includes(":")) return text;
+  const idx = text.indexOf(":");
+  const ivHex = text.slice(0, idx);
+  const dataHex = text.slice(idx + 1);
   const key = await getKey();
   const iv = hexToBytes(ivHex);
   const data = hexToBytes(dataHex);

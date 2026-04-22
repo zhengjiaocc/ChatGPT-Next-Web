@@ -1,9 +1,10 @@
 import { jwtVerify } from "jose";
 import { NextRequest } from "next/server";
 
-const SECRET = new TextEncoder().encode(
-  process.env.NEXTAUTH_SECRET ?? "secret",
-);
+if (!process.env.NEXTAUTH_SECRET) {
+  throw new Error("NEXTAUTH_SECRET environment variable is required");
+}
+const SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
 
 export async function getUser(req: NextRequest) {
   const token = req.cookies.get("token")?.value;
