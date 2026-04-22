@@ -74,12 +74,12 @@ export const DEFAULT_CONFIG = {
     providerId: "",
     temperature: 0.5,
     top_p: 1,
-    max_tokens: 4000,
+    max_tokens: 8192,
     presence_penalty: 0,
     frequency_penalty: 0,
     sendMemory: true,
-    historyMessageCount: 4,
-    compressMessageLengthThreshold: 4000,
+    historyMessageCount: 16,
+    compressMessageLengthThreshold: 32000,
     compressModel: "",
     compressProviderName: "",
     compressProviderId: "",
@@ -239,7 +239,7 @@ export const useAppConfig = createPersistStore(
   }),
   {
     name: StoreKey.Config,
-    version: 4.1,
+    version: 4.2,
 
     merge(persistedState, currentState) {
       const state = persistedState as ChatConfig | undefined;
@@ -297,6 +297,12 @@ export const useAppConfig = createPersistStore(
           DEFAULT_CONFIG.modelConfig.compressModel;
         state.modelConfig.compressProviderName =
           DEFAULT_CONFIG.modelConfig.compressProviderName;
+      }
+
+      if (version < 4.2) {
+        state.modelConfig.historyMessageCount = 16;
+        state.modelConfig.compressMessageLengthThreshold = 32000;
+        state.modelConfig.max_tokens = 8192;
       }
 
       return state as any;
