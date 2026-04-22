@@ -8,7 +8,6 @@ import {
   DEFAULT_TTS_ENGINES,
   DEFAULT_TTS_MODEL,
   DEFAULT_TTS_MODELS,
-  DEFAULT_TTS_VOICE,
   DEFAULT_TTS_VOICES,
   StoreKey,
   ServiceProvider,
@@ -213,7 +212,7 @@ export const useAppConfig = createPersistStore(
       if (!isLoggedIn()) return;
       const state = get();
       const { models, ...config } = state as any;
-      await fetch("/api/db/config", {
+      await fetch("/api/user/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
@@ -222,7 +221,7 @@ export const useAppConfig = createPersistStore(
 
     async loadFromDB() {
       if (!isLoggedIn()) return;
-      const res = await fetch("/api/db/config");
+      const res = await fetch("/api/user/config");
       if (res.status === 401) {
         useUserStore.getState().logout();
         set(() => ({ ...DEFAULT_CONFIG }));

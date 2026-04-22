@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUser } from "../../../../lib/auth";
-import sql from "../../../../lib/db";
+import { getUser } from "../../../lib/auth";
+import sql from "../../../lib/db";
 
 export const runtime = "edge";
 

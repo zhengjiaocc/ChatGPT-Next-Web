@@ -32,7 +32,6 @@ import { prettyObject } from "../utils/format";
 import { createPersistStore } from "../utils/store";
 import { estimateTokenLength, getAvailableContextTokens } from "../utils/token";
 import { ModelConfig, ModelType, useAppConfig } from "./config";
-import { useAccessStore } from "./access";
 import { createEmptyMask, Mask } from "./mask";
 import { executeMcpAction, getAllTools, isMcpEnabled } from "../mcp/actions";
 import { extractMcpJson, isMcpJson } from "../mcp/utils";
@@ -263,7 +262,7 @@ async function syncSessionPayloadToDB(
 ) {
   for (let i = 0; i < retries; i++) {
     try {
-      const res = await fetchWithTimeout("/api/db/sessions", {
+      const res = await fetchWithTimeout("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -317,7 +316,7 @@ async function deleteSessionFromDB(id: string) {
   sessionSyncTimers.delete(id);
   pendingSessionSyncPayload.delete(id);
   sessionSyncRunning.delete(id);
-  await fetch("/api/db/sessions", {
+  await fetch("/api/sessions", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id }),
@@ -549,7 +548,9 @@ export const useChatStore = createPersistStore(
         const modelConfig = session.mask.modelConfig;
 
         if (!modelConfig.model || !modelConfig.providerName) {
-          showToast("错误：尚未配置模型。请先在提供商列表中手动选择并配置一个主模型！");
+          showToast(
+            "错误：尚未配置模型。请先在提供商列表中手动选择并配置一个主模型！",
+          );
           return;
         }
 
@@ -1039,7 +1040,7 @@ export const useChatStore = createPersistStore(
           return;
         }
         try {
-          const res = await fetchWithTimeout("/api/db/sessions");
+          const res = await fetchWithTimeout("/api/sessions");
           if (res.status === 401) {
             useUserStore.getState().logout();
             set({
@@ -1138,7 +1139,7 @@ export const useChatStore = createPersistStore(
         const index = get().sessions.findIndex((s) => s.id === sessionId);
         if (index < 0 || get().sessions[index].messagesLoaded) return;
         try {
-          const res = await fetchWithTimeout(`/api/db/sessions/${sessionId}`);
+          const res = await fetchWithTimeout(`/api/sessions/${sessionId}`);
           if (res.status === 401) {
             useUserStore.getState().logout();
             throw new Error("unauthorized");

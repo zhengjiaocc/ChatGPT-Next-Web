@@ -9,7 +9,7 @@ function isLoggedIn() {
 
 async function syncProviderToDB(p: ProviderInstance) {
   if (!isLoggedIn()) return;
-  await fetch("/api/db/providers", {
+  await fetch("/api/providers", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -26,7 +26,7 @@ async function syncProviderToDB(p: ProviderInstance) {
 
 async function deleteProviderFromDB(id: string) {
   if (!isLoggedIn()) return;
-  await fetch("/api/db/providers", {
+  await fetch("/api/providers", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id }),
@@ -155,7 +155,7 @@ export const useProviderStore = createPersistStore(
 
     async loadFromDB() {
       if (!isLoggedIn()) return;
-      const res = await fetch("/api/db/providers");
+      const res = await fetch("/api/providers");
       if (res.status === 401) {
         useUserStore.getState().logout();
         set({ providers: [] });
