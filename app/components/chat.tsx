@@ -99,8 +99,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import {
   CHAT_PAGE_SIZE,
-  DEFAULT_TTS_ENGINE,
-  ModelProvider,
   Path,
   REQUEST_TIMEOUT_MS,
   ServiceProvider,
@@ -116,7 +114,7 @@ import { ExportMessageModal } from "./exporter";
 import { getClientConfig } from "../config/client";
 import { useAllModels } from "../utils/hooks";
 import { useProviderStore } from "../store/provider";
-import { ClientApi, MultimodalContent } from "../client/api";
+import { MultimodalContent } from "../client/api";
 
 import { isEmpty } from "lodash-es";
 import { getModelProvider } from "../utils/model";
@@ -124,7 +122,6 @@ import clsx from "clsx";
 import { getAvailableClientsCount, isMcpEnabled } from "../mcp/actions";
 
 const localStorage = safeLocalStorage();
-
 
 const Markdown = dynamic(async () => (await import("./markdown")).Markdown, {
   loading: () => <LoadingIcon />,
@@ -1049,9 +1046,9 @@ function _Chat() {
     }
   }, [session?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // scroll to bottom when messages finish loading
+  // scroll to bottom when messages finish loading or session changes
   useEffect(() => {
-    if (session?.messagesLoaded === true) {
+    if (session?.messagesLoaded !== false) {
       const dom = scrollRef.current;
       if (dom) {
         requestAnimationFrame(() => {
@@ -1059,7 +1056,7 @@ function _Chat() {
         });
       }
     }
-  }, [session?.messagesLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session?.id, session?.messagesLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const config = useAppConfig();
   const providerStore = useProviderStore();
@@ -1344,9 +1341,6 @@ function _Chat() {
   };
 
   const accessStore = useAccessStore();
-
-
-
 
   const context: RenderMessage[] = useMemo(() => {
     return session.mask.hideContext ? [] : session.mask.context.slice();
@@ -1922,7 +1916,6 @@ function _Chat() {
                                             )
                                           }
                                         />
-
                                       </>
                                     )}
                                   </div>
@@ -2207,9 +2200,7 @@ export function Chat() {
         }}
       >
         <div>
-          <div
-            style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}
-          >
+          <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>
             尚未配置模型供应商
           </div>
           <div style={{ fontSize: 14, opacity: 0.6, lineHeight: 1.6 }}>
