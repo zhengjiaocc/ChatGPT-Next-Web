@@ -1124,6 +1124,10 @@ export const useChatStore = createPersistStore(
             dbLoaded: true,
             dbLoadState: "ready",
           });
+          // 预取第一个 session 的消息，避免等待 React 渲染周期
+          if (sessions.length > 0) {
+            void get().loadSessionMessages(sessions[0].id);
+          }
         } catch (e) {
           console.error("[Chat] failed to load sessions from db", e);
           set({ dbLoaded: true, dbLoadState: "error" });
