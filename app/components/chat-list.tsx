@@ -15,7 +15,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Path } from "../constant";
 import { MaskAvatar } from "./mask";
 import { Mask } from "../store/mask";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { showConfirm } from "./ui-lib";
 import { useMobileScreen } from "../utils";
 import clsx from "clsx";
@@ -114,23 +114,24 @@ export function ChatList(props: { narrow?: boolean }) {
   const chatStore = useChatStore();
   const navigate = useNavigate();
   const isMobileScreen = useMobileScreen();
+  const listRef = useRef<HTMLDivElement>(null);
+  const [containerHeight, setContainerHeight] = useState(400);
 
-  // sessions 由 IndexedDB 异步加载，首次渲染时为初始默认值，无法用作骨架数量
-  // narrow 模式下每条 item 高度 ≈ 50px + 11px margin = 61px
-  // 普通模式下 ≈ 71px（含 padding/border）
+  useEffect(() => {
+    const el = listRef.current?.parentElement;
+    if (!el) return;
+    setContainerHeight(el.clientHeight);
+    const ro = new ResizeObserver(() => setContainerHeight(el.clientHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const ITEM_HEIGHT = props.narrow ? 61 : 71;
-  const sidebarBodyHeight =
-    typeof window !== "undefined"
-      ? window.innerHeight - (isMobileScreen ? 200 : 250)
-      : 400;
-  const skeletonCount = Math.max(
-    3,
-    Math.floor(sidebarBodyHeight / ITEM_HEIGHT),
-  );
+  const skeletonCount = Math.max(3, Math.floor(containerHeight / ITEM_HEIGHT));
 
   if (!chatStore.dbLoaded) {
     return (
-      <div className={styles["chat-list"]}>
+      <div className={styles["chat-list"]} ref={listRef}>
         {Array.from({ length: skeletonCount }).map((_, i) =>
           props.narrow ? (
             // 收起模式：完美复刻原组件的 chat-item-narrow 和 chat-item-avatar
