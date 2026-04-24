@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const sessions = await sql`
-    SELECT id, title, model, mask, memory_prompt, last_summarize_index, updated_at,
+    SELECT id, title, model, mask, memory_prompt, memory_history, last_summarize_index, updated_at,
       jsonb_array_length(messages) AS message_count
     FROM chat_sessions
     WHERE user_id = ${user.id} ORDER BY updated_at DESC
@@ -24,21 +24,30 @@ export async function POST(req: NextRequest) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { id, title, messages, model, mask, memoryPrompt, lastSummarizeIndex } =
-    await req.json();
+  const {
+    id,
+    title,
+    messages,
+    model,
+    mask,
+    memoryPrompt,
+    memoryHistory,
+    lastSummarizeIndex,
+  } = await req.json();
   await sql`
-    INSERT INTO chat_sessions (id, user_id, title, messages, model, mask, memory_prompt, last_summarize_index)
+    INSERT INTO chat_sessions (id, user_id, title, messages, model, mask, memory_prompt, memory_history, last_summarize_index)
     VALUES (${id}, ${user.id}, ${title}, ${JSON.stringify(
       messages,
-    )}, ${model}, ${JSON.stringify(mask)}, ${memoryPrompt ?? ""}, ${
-      lastSummarizeIndex ?? 0
-    })
+    )}, ${model}, ${JSON.stringify(mask)}, ${
+      memoryPrompt ?? ""
+    }, ${JSON.stringify(memoryHistory ?? [])}, ${lastSummarizeIndex ?? 0})
     ON CONFLICT (id) DO UPDATE SET
       title = EXCLUDED.title,
       messages = EXCLUDED.messages,
       model = EXCLUDED.model,
       mask = EXCLUDED.mask,
       memory_prompt = EXCLUDED.memory_prompt,
+      memory_history = EXCLUDED.memory_history,
       last_summarize_index = EXCLUDED.last_summarize_index,
       updated_at = NOW()
   `;

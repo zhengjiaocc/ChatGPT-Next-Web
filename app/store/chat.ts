@@ -225,6 +225,7 @@ type SessionSyncPayload = {
   model: string;
   mask: Mask;
   memoryPrompt: string;
+  memoryHistory: string[];
   lastSummarizeIndex: number;
 };
 
@@ -254,6 +255,7 @@ function buildSessionSyncPayload(
     model: session.mask.modelConfig.model,
     mask: session.mask,
     memoryPrompt: session.memoryPrompt,
+    memoryHistory: session.memoryHistory ?? [],
     lastSummarizeIndex: session.lastSummarizeIndex,
   };
 }
@@ -1096,6 +1098,7 @@ export const useChatStore = createPersistStore(
               messageCount: r.message_count ?? 0,
               mask: r.mask ?? createEmptyMask(),
               memoryPrompt: r.memory_prompt ?? "",
+              memoryHistory: r.memory_history ?? [],
               lastSummarizeIndex: r.last_summarize_index ?? 0,
               lastUpdate: new Date(r.updated_at).getTime(),
             };
