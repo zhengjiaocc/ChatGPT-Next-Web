@@ -31,6 +31,17 @@ export function LoginPage() {
       setError("用户名和密码不能为空");
       return;
     }
+    if (mode === "register") {
+      if (
+        password.length < 8 ||
+        !/[A-Z]/.test(password) ||
+        !/[0-9]/.test(password) ||
+        !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+      ) {
+        setError("密码需至少8位，包含大写字母、数字和特殊字符");
+        return;
+      }
+    }
     if (TURNSTILE_SITE_KEY && !turnstileToken) {
       setError("请完成人机验证");
       return;
@@ -102,6 +113,41 @@ export function LoginPage() {
             {showPwd ? <EyeIcon /> : <EyeOffIcon />}
           </span>
         </div>
+
+        {mode === "register" && password.length > 0 && (
+          <div className={styles.pwdHints}>
+            <span
+              className={`${styles.hint} ${
+                password.length >= 8 ? styles.met : ""
+              }`}
+            >
+              ≥8位
+            </span>
+            <span
+              className={`${styles.hint} ${
+                /[A-Z]/.test(password) ? styles.met : ""
+              }`}
+            >
+              大写字母
+            </span>
+            <span
+              className={`${styles.hint} ${
+                /[0-9]/.test(password) ? styles.met : ""
+              }`}
+            >
+              数字
+            </span>
+            <span
+              className={`${styles.hint} ${
+                /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+                  ? styles.met
+                  : ""
+              }`}
+            >
+              特殊字符
+            </span>
+          </div>
+        )}
 
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}

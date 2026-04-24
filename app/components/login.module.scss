@@ -136,6 +136,28 @@
   align-self: flex-start;
 }
 
+.pwdHints {
+  align-self: flex-start;
+  font-size: 12px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hint {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--hover-color);
+  color: var(--black);
+  opacity: 0.5;
+
+  &.met {
+    opacity: 1;
+    color: var(--primary);
+  }
+}
+
 .btn {
   width: 100%;
   margin-top: 4px;

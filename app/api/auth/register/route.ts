@@ -11,7 +11,22 @@ export async function POST(req: NextRequest) {
   }
 
   if (!username?.trim() || !password?.trim()) {
-    return NextResponse.json({ error: "用户名和密码不能为空" }, { status: 400 });
+    return NextResponse.json(
+      { error: "用户名和密码不能为空" },
+      { status: 400 },
+    );
+  }
+
+  if (
+    password.length < 8 ||
+    !/[A-Z]/.test(password) ||
+    !/[0-9]/.test(password) ||
+    !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+  ) {
+    return NextResponse.json(
+      { error: "密码需至少8位，包含大写字母、数字和特殊字符" },
+      { status: 400 },
+    );
   }
 
   const existing = await sql`SELECT id FROM users WHERE username = ${username}`;
