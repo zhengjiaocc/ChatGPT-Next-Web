@@ -27,7 +27,6 @@ import { SideBar } from "./sidebar";
 import { useAppConfig } from "../store/config";
 import { LoginPage } from "./login";
 import { getClientConfig } from "../config/client";
-import { type ClientApi, getClientApi } from "../client/api";
 import { useChatStore, useAccessStore } from "../store";
 import { useProviderStore } from "../store/provider";
 import { useUserStore } from "../store/user";
@@ -116,6 +115,11 @@ export function useSwitchTheme() {
     } else if (config.theme === "light") {
       document.body.classList.add("light");
     }
+
+    // 同步写入 localStorage 供内联 script 在下次刷新时读取
+    try {
+      localStorage.setItem("theme", config.theme);
+    } catch (e) {}
 
     const metaDescriptionDark = document.querySelector(
       'meta[name="theme-color"][media*="dark"]',

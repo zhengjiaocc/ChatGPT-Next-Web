@@ -44,7 +44,7 @@ export default function RootLayout({
         />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=JSON.parse(localStorage.getItem('app-config')||'{}');var t=s&&s.state&&s.state.theme;if(t==='dark')document.body.classList.add('dark');else if(t==='light')document.body.classList.add('light');}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.body.classList.add('dark');else if(t==='light')document.body.classList.add('light');}catch(e){}})();`,
           }}
         />
         <link
