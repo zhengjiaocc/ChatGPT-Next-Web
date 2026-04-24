@@ -1873,7 +1873,7 @@ function _Chat() {
                       const contextStart = Math.max(clearIdx, memoryStart);
                       const sentCount = Math.max(
                         0,
-                        sessionMsgIndex - contextStart,
+                        sessionMsgIndex - Math.max(clearIdx, shortTermStart),
                       );
                       return {
                         sentCount,
