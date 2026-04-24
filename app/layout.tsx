@@ -42,6 +42,11 @@ export default function RootLayout({
           name="viewport"
           content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=JSON.parse(localStorage.getItem('app-config')||'{}');var t=s&&s.state&&s.state.theme;if(t==='dark')document.body.classList.add('dark');else if(t==='light')document.body.classList.add('light');}catch(e){}})();`,
+          }}
+        />
         <link
           rel="manifest"
           href="/site.webmanifest"
