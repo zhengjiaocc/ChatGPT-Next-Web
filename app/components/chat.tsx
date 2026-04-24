@@ -1718,25 +1718,52 @@ function _Chat() {
                             padding: "0 16px",
                           }}
                         >
-                          {session.memoryHistory.map((h, i) => (
-                            <div key={i} style={{ marginBottom: 16 }}>
+                          {session.memoryHistory
+                            .slice()
+                            .reverse()
+                            .map((h, i, arr) => (
                               <div
+                                key={i}
                                 style={{
-                                  fontWeight: "bold",
-                                  marginBottom: 4,
-                                  opacity: 0.6,
-                                  fontSize: 12,
+                                  marginBottom: 12,
+                                  border: "1px solid var(--border-in-light)",
+                                  borderRadius: 8,
+                                  padding: "10px 14px",
+                                  background: "var(--white)",
                                 }}
                               >
-                                #{i + 1}
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    marginBottom: 8,
+                                    fontSize: 12,
+                                    opacity: 0.5,
+                                  }}
+                                >
+                                  <span>第 {arr.length - i} 次压缩</span>
+                                  {i === 0 && (
+                                    <span
+                                      style={{
+                                        color: "var(--primary)",
+                                        opacity: 1,
+                                      }}
+                                    >
+                                      最新
+                                    </span>
+                                  )}
+                                </div>
+                                <div
+                                  style={{
+                                    whiteSpace: "pre-wrap",
+                                    fontSize: 13,
+                                    lineHeight: 1.6,
+                                  }}
+                                >
+                                  {h}
+                                </div>
                               </div>
-                              <div
-                                style={{ whiteSpace: "pre-wrap", fontSize: 13 }}
-                              >
-                                {h}
-                              </div>
-                            </div>
-                          ))}
+                            ))}
                         </div>
                       ),
                     })
@@ -2085,25 +2112,52 @@ function _Chat() {
                             暂无压缩记录
                           </div>
                         ) : (
-                          (session.memoryHistory ?? []).map((h, i) => (
-                            <div key={i} style={{ marginBottom: 16 }}>
+                          (session.memoryHistory ?? [])
+                            .slice()
+                            .reverse()
+                            .map((h, i, arr) => (
                               <div
+                                key={i}
                                 style={{
-                                  fontWeight: "bold",
-                                  marginBottom: 4,
-                                  opacity: 0.6,
-                                  fontSize: 12,
+                                  marginBottom: 12,
+                                  border: "1px solid var(--border-in-light)",
+                                  borderRadius: 8,
+                                  padding: "10px 14px",
+                                  background: "var(--white)",
                                 }}
                               >
-                                #{i + 1}
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    marginBottom: 8,
+                                    fontSize: 12,
+                                    opacity: 0.5,
+                                  }}
+                                >
+                                  <span>第 {arr.length - i} 次压缩</span>
+                                  {i === 0 && (
+                                    <span
+                                      style={{
+                                        color: "var(--primary)",
+                                        opacity: 1,
+                                      }}
+                                    >
+                                      最新
+                                    </span>
+                                  )}
+                                </div>
+                                <div
+                                  style={{
+                                    whiteSpace: "pre-wrap",
+                                    fontSize: 13,
+                                    lineHeight: 1.6,
+                                  }}
+                                >
+                                  {h}
+                                </div>
                               </div>
-                              <div
-                                style={{ whiteSpace: "pre-wrap", fontSize: 13 }}
-                              >
-                                {h}
-                              </div>
-                            </div>
-                          ))
+                            ))
                         )}
                       </div>
                     ),
