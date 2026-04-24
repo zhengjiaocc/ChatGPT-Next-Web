@@ -411,6 +411,40 @@
   }
 }
 
+.chat-message-info-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  color: var(--black);
+  opacity: 0.6;
+  border-radius: 10px;
+
+  &:hover {
+    background-color: var(--hover-color);
+    opacity: 1;
+  }
+}
+
+.chat-message-info-popover {
+  position: absolute;
+  right: 0;
+  top: 24px;
+  background: var(--white);
+  border: 1px solid var(--border-in-light);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.8;
+  white-space: nowrap;
+  z-index: 100;
+  box-shadow: var(--card-shadow);
+  color: var(--black);
+}
+
 .chat-message-status {
   font-size: 12px;
   color: #aaa;

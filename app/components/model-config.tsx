@@ -53,8 +53,8 @@ export function ModelConfigList(props: {
     (props.modelConfig.compressModel && !hasNoModels
       ? props.modelConfig.compressModel
       : hasNoModels
-        ? "请先配置供应商"
-        : Locale.Settings.CompressModel.Title);
+      ? "请先配置供应商"
+      : Locale.Settings.CompressModel.Title);
 
   return (
     <>
@@ -189,24 +189,6 @@ export function ModelConfigList(props: {
                 );
               }}
             ></InputRange>
-          </ListItem>
-
-          <ListItem
-            title={Locale.Settings.InjectSystemPrompts.Title}
-            subTitle={Locale.Settings.InjectSystemPrompts.SubTitle}
-          >
-            <input
-              aria-label={Locale.Settings.InjectSystemPrompts.Title}
-              type="checkbox"
-              checked={props.modelConfig.enableInjectSystemPrompts}
-              onChange={(e) =>
-                props.updateConfig(
-                  (config) =>
-                    (config.enableInjectSystemPrompts =
-                      e.currentTarget.checked),
-                )
-              }
-            ></input>
           </ListItem>
 
           <ListItem
