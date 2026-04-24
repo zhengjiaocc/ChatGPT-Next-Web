@@ -50,8 +50,6 @@ export enum Path {
   Plugins = "/plugins",
   Auth = "/auth",
   Login = "/login",
-  Sd = "/sd",
-  SdNew = "/sd-new",
   Artifacts = "/artifacts",
   SearchChat = "/search-chat",
   McpMarket = "/mcp-market",
@@ -97,7 +95,6 @@ export enum StoreKey {
   Prompt = "prompt-store",
   Update = "chat-update",
   Sync = "sync",
-  SdList = "sd-list",
   Mcp = "mcp-store",
   Provider = "provider-store",
   User = "user-store",
@@ -496,7 +493,7 @@ export const VISION_MODEL_REGEXES = [
   /o3/,
   /o4-mini/,
   /grok-4/i,
-  /gpt-5/
+  /gpt-5/,
 ];
 
 export const EXCLUDE_VISION_MODEL_REGEXES = [/claude-3-5-haiku-20241022/];

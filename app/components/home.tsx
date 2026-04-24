@@ -92,10 +92,6 @@ const SearchChat = dynamic(
   },
 );
 
-const Sd = dynamic(async () => (await import("./sd")).Sd, {
-  loading: () => <Loading noLogo />,
-});
-
 const McpMarketPage = dynamic(
   async () => (await import("./mcp-market")).McpMarketPage,
   {
@@ -116,17 +112,9 @@ export function useSwitchTheme() {
       document.body.classList.add("light");
     }
 
-    console.log(
-      "[useSwitchTheme] theme:",
-      config.theme,
-      "body:",
-      document.body.className,
-    );
-
     // 同步写入 localStorage 供内联 script 在下次刷新时读取
     try {
       localStorage.setItem("theme", config.theme);
-      console.log("[useSwitchTheme] saved to localStorage:", config.theme);
     } catch (e) {}
 
     const metaDescriptionDark = document.querySelector(
@@ -199,9 +187,6 @@ function Screen() {
   const isArtifact = location.pathname.includes(Path.Artifacts);
   const isHome = location.pathname === Path.Home;
   const isLogin = location.pathname === Path.Login;
-  const isSd = location.pathname === Path.Sd;
-  const isSdNew = location.pathname === Path.SdNew;
-
   const isMobileScreen = useMobileScreen();
   const shouldTightBorder =
     getClientConfig()?.isApp || (config.tightBorder && !isMobileScreen);
@@ -225,8 +210,6 @@ function Screen() {
     );
   }
   const renderContent = () => {
-    if (isSd) return <Sd />;
-    if (isSdNew) return <Sd />;
     return (
       <>
         <SideBar
@@ -271,7 +254,6 @@ export function Home() {
   const userStore = useUserStore();
 
   useEffect(() => {
-    console.log("[Config] got config from build time", getClientConfig());
     useAccessStore.getState().fetch();
 
     const initMcp = async () => {
