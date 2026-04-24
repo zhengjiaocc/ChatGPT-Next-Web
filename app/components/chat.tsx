@@ -24,7 +24,6 @@ import MaxIcon from "../icons/max.svg";
 import MinIcon from "../icons/min.svg";
 import ResetIcon from "../icons/reload.svg";
 import ReloadIcon from "../icons/reload.svg";
-import BreakIcon from "../icons/break.svg";
 import SettingsIcon from "../icons/chat-settings.svg";
 import DeleteIcon from "../icons/clear.svg";
 import PinIcon from "../icons/pin.svg";
@@ -654,26 +653,6 @@ export function ChatActions(props: {
           }}
           text={Locale.Chat.InputActions.Masks}
           icon={<MaskIcon />}
-        />
-
-        <ChatAction
-          key="clear"
-          text={Locale.Chat.InputActions.Clear}
-          icon={<BreakIcon />}
-          onClick={async () => {
-            const isSet = session.clearContextIndex === session.messages.length;
-            if (!isSet && !(await showConfirm(Locale.Memory.ResetConfirm))) {
-              return;
-            }
-            chatStore.updateTargetSession(session, (session) => {
-              if (isSet) {
-                session.clearContextIndex = undefined;
-              } else {
-                session.clearContextIndex = session.messages.length;
-                session.memoryPrompt = ""; // will clear memory
-              }
-            });
-          }}
         />
 
         <ChatAction
