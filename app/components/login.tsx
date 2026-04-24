@@ -57,7 +57,10 @@ export function LoginPage() {
         body: JSON.stringify({ username, password, turnstileToken }),
       },
     );
-    const data = await res.json();
+    let data: any = {};
+    try {
+      data = await res.json();
+    } catch {}
     setLoading(false);
     if (!res.ok) {
       setError(data.error ?? "操作失败");
