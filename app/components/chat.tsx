@@ -1864,27 +1864,20 @@ function _Chat() {
                       if (!isUser || isContext) return null;
                       const modelConfig = session.mask.modelConfig;
                       const clearIdx = session.clearContextIndex ?? 0;
-                      const sessionMessages = session.messages;
-                      const totalCount = sessionMessages.length;
                       // i 是在 messages（含 context）中的索引，需要换算成 session.messages 中的索引
                       const sessionMsgIndex = i - context.length;
-                      const shortTermStart = Math.max(
-                        0,
-                        totalCount - modelConfig.historyMessageCount,
-                      );
-                      const longTermMemoryStart = session.lastSummarizeIndex;
                       const hasLongTermMemory =
                         modelConfig.sendMemory &&
                         !!session.memoryPrompt &&
                         session.memoryPrompt.length > 0 &&
                         session.lastSummarizeIndex > clearIdx;
-                      const memoryStart = hasLongTermMemory
-                        ? Math.min(longTermMemoryStart, shortTermStart)
-                        : shortTermStart;
-                      const contextStart = Math.max(clearIdx, memoryStart);
-                      const sentCount = Math.max(
-                        0,
-                        sessionMsgIndex - Math.max(clearIdx, shortTermStart),
+                      const effectiveStart = Math.max(
+                        clearIdx,
+                        hasLongTermMemory ? session.lastSummarizeIndex : 0,
+                      );
+                      const sentCount = Math.min(
+                        Math.max(0, sessionMsgIndex - effectiveStart),
+                        modelConfig.historyMessageCount,
                       );
                       return {
                         sentCount,
