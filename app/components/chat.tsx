@@ -90,6 +90,7 @@ import {
   Modal,
   Selector,
   showConfirm,
+  showModal,
   showPrompt,
   showToast,
 } from "./ui-lib";
@@ -1054,7 +1055,6 @@ function _Chat() {
   const fontFamily = config.fontFamily;
 
   const [showExport, setShowExport] = useState(false);
-  const [showMemoryHistory, setShowMemoryHistory] = useState(false);
   const [showModelSelector, setShowModelSelector] = useState(false);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -1728,7 +1728,40 @@ function _Chat() {
                   icon={<BrainIcon />}
                   bordered
                   title={`压缩历史 (${session.memoryHistory.length})`}
-                  onClick={() => setShowMemoryHistory(true)}
+                  onClick={() =>
+                    showModal({
+                      title: `压缩历史记录 (${session.memoryHistory.length} 条)`,
+                      children: (
+                        <div
+                          style={{
+                            maxHeight: "60vh",
+                            overflowY: "auto",
+                            padding: "0 16px",
+                          }}
+                        >
+                          {session.memoryHistory.map((h, i) => (
+                            <div key={i} style={{ marginBottom: 16 }}>
+                              <div
+                                style={{
+                                  fontWeight: "bold",
+                                  marginBottom: 4,
+                                  opacity: 0.6,
+                                  fontSize: 12,
+                                }}
+                              >
+                                #{i + 1}
+                              </div>
+                              <div
+                                style={{ whiteSpace: "pre-wrap", fontSize: 13 }}
+                              >
+                                {h}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ),
+                    })
+                  }
                 />
               </div>
             )}
@@ -2055,7 +2088,48 @@ function _Chat() {
                 setShowChatSidePanel={setShowChatSidePanel}
                 setShowModelSelector={setShowModelSelector}
                 showModelSelector={showModelSelector}
-                onShowMemoryHistory={() => setShowMemoryHistory(true)}
+                onShowMemoryHistory={() =>
+                  showModal({
+                    title: `压缩历史记录 (${
+                      session.memoryHistory?.length ?? 0
+                    } 条)`,
+                    children: (
+                      <div
+                        style={{
+                          maxHeight: "60vh",
+                          overflowY: "auto",
+                          padding: "0 16px",
+                        }}
+                      >
+                        {(session.memoryHistory ?? []).length === 0 ? (
+                          <div style={{ opacity: 0.5, padding: "16px 0" }}>
+                            暂无压缩记录
+                          </div>
+                        ) : (
+                          (session.memoryHistory ?? []).map((h, i) => (
+                            <div key={i} style={{ marginBottom: 16 }}>
+                              <div
+                                style={{
+                                  fontWeight: "bold",
+                                  marginBottom: 4,
+                                  opacity: 0.6,
+                                  fontSize: 12,
+                                }}
+                              >
+                                #{i + 1}
+                              </div>
+                              <div
+                                style={{ whiteSpace: "pre-wrap", fontSize: 13 }}
+                              >
+                                {h}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    ),
+                  })
+                }
               />
               <label
                 className={clsx(styles["chat-input-panel-inner"], {
@@ -2136,32 +2210,6 @@ function _Chat() {
       </div>
       {showExport && (
         <ExportMessageModal onClose={() => setShowExport(false)} />
-      )}
-      {showMemoryHistory && (
-        <Modal
-          title={`压缩历史记录 (${session.memoryHistory?.length ?? 0} 条)`}
-          onClose={() => setShowMemoryHistory(false)}
-        >
-          <div
-            style={{ maxHeight: "60vh", overflowY: "auto", padding: "0 16px" }}
-          >
-            {(session.memoryHistory ?? []).map((h, i) => (
-              <div key={i} style={{ marginBottom: 16 }}>
-                <div
-                  style={{
-                    fontWeight: "bold",
-                    marginBottom: 4,
-                    opacity: 0.6,
-                    fontSize: 12,
-                  }}
-                >
-                  #{i + 1}
-                </div>
-                <div style={{ whiteSpace: "pre-wrap", fontSize: 13 }}>{h}</div>
-              </div>
-            ))}
-          </div>
-        </Modal>
       )}
 
       {isEditingMessage && (
