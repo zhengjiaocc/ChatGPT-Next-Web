@@ -682,10 +682,10 @@ export function ChatActions(props: {
           icon={<RobotIcon />}
         />
 
-        {props.onShowMemoryHistory && (
+        {(props.onShowMemoryHistory || config.showMemoryHistoryButton) && (
           <ChatAction
             key="memory-history"
-            onClick={props.onShowMemoryHistory}
+            onClick={() => props.onShowMemoryHistory?.()}
             text="压缩历史"
             icon={<BrainIcon />}
           />
@@ -2055,12 +2055,7 @@ function _Chat() {
                 setShowChatSidePanel={setShowChatSidePanel}
                 setShowModelSelector={setShowModelSelector}
                 showModelSelector={showModelSelector}
-                onShowMemoryHistory={
-                  config.showMemoryHistoryButton ||
-                  (session.memoryHistory?.length ?? 0) > 0
-                    ? () => setShowMemoryHistory(true)
-                    : undefined
-                }
+                onShowMemoryHistory={() => setShowMemoryHistory(true)}
               />
               <label
                 className={clsx(styles["chat-input-panel-inner"], {
