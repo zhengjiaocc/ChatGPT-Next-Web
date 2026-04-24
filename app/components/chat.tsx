@@ -1282,6 +1282,11 @@ function _Chat() {
     // truncate the messages from the user message index
     chatStore.updateTargetSession(session, (session) => {
       session.messages.splice(userMessageIndex);
+      // if memory was summarized beyond the truncation point, discard it
+      if (session.lastSummarizeIndex > userMessageIndex) {
+        session.lastSummarizeIndex = 0;
+        session.memoryPrompt = "";
+      }
     });
 
     // resend the message
