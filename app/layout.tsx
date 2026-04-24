@@ -44,7 +44,7 @@ export default function RootLayout({
         />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.body.classList.add('dark');else if(t==='light')document.body.classList.add('light');}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('theme');console.log('[theme-init] localStorage theme:', t);if(t==='dark')document.body.classList.add('dark');else if(t==='light')document.body.classList.add('light');console.log('[theme-init] body classes:', document.body.className);}catch(e){console.error('[theme-init] error:', e);}})();`,
           }}
         />
         <link

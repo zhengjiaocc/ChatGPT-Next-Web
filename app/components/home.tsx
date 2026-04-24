@@ -116,9 +116,17 @@ export function useSwitchTheme() {
       document.body.classList.add("light");
     }
 
+    console.log(
+      "[useSwitchTheme] theme:",
+      config.theme,
+      "body:",
+      document.body.className,
+    );
+
     // 同步写入 localStorage 供内联 script 在下次刷新时读取
     try {
       localStorage.setItem("theme", config.theme);
+      console.log("[useSwitchTheme] saved to localStorage:", config.theme);
     } catch (e) {}
 
     const metaDescriptionDark = document.querySelector(

@@ -226,7 +226,8 @@ export const useAppConfig = createPersistStore(
       const config = await res.json();
       if (config && Object.keys(config).length > 0) {
         // 从云端配置中剔除 sidebarWidth，侧边栏大小应留在本地，漫游会导致桌面端收起状态被别的设备宽状态强行冲掉而闪烁
-        const { sidebarWidth, ...cloudConfig } = config;
+        // 同样剔除 theme，主题偏好属于本地设备设置，不应被云端覆盖
+        const { sidebarWidth, theme: _theme, ...cloudConfig } = config;
 
         // 对云端 modelConfig 做迁移清洗：
         // 云端可能保存了已废弃的内置模型名（如 gpt-4o-mini / gpt-3.5-turbo）
