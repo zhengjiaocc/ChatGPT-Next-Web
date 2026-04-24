@@ -16,6 +16,7 @@ import AddIcon from "../icons/add.svg";
 import DeleteIcon from "../icons/delete.svg";
 import DarkIcon from "../icons/dark.svg";
 import LightIcon from "../icons/light.svg";
+import AutoIcon from "../icons/auto.svg";
 import MaskIcon from "../icons/mask.svg";
 import McpIcon from "../icons/mcp.svg";
 import DragIcon from "../icons/drag.svg";
@@ -338,12 +339,20 @@ export function SideBar(props: { className?: string }) {
               <IconButton
                 aria="切换主题"
                 icon={
-                  config.theme === Theme.Dark ? <LightIcon /> : <DarkIcon />
+                  config.theme === Theme.Auto ? (
+                    <AutoIcon />
+                  ) : config.theme === Theme.Light ? (
+                    <LightIcon />
+                  ) : (
+                    <DarkIcon />
+                  )
                 }
                 shadow
                 onClick={() =>
                   config.update((c) => {
-                    c.theme = c.theme === Theme.Dark ? Theme.Light : Theme.Dark;
+                    const themes = [Theme.Auto, Theme.Light, Theme.Dark];
+                    const idx = themes.indexOf(c.theme);
+                    c.theme = themes[(idx + 1) % themes.length];
                   })
                 }
               />
