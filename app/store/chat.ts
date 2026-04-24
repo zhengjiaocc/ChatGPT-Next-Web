@@ -80,6 +80,16 @@ export type ChatMessage = RequestMessage & {
   tools?: ChatMessageTool[];
   audio_url?: string;
   isMcpResponse?: boolean;
+  /**
+   * 发送该条消息时的上下文信息快照（用于 UI 展示）。
+   * 注意：这是“真实发送值”，而不是基于配置的估算。
+   */
+  contextInfo?: {
+    sentCount: number;
+    contextPromptsCount: number;
+    hasLongTermMemory: boolean;
+    memoryPrompt?: string;
+  };
 };
 
 export function createMessage(override: Partial<ChatMessage>): ChatMessage {
@@ -585,8 +595,14 @@ export const useChatStore = createPersistStore(
         });
 
         // get recent messages before writing to session to avoid sending userMessage twice
-        const recentMessages = await get().getMessagesWithMemory();
-        const sendMessages = recentMessages.concat(userMessage);
+        const ctx = await get().getMessagesWithMemoryContext();
+        userMessage.contextInfo = {
+          sentCount: ctx.sentHistoryCount,
+          contextPromptsCount: ctx.contextPromptsCount,
+          hasLongTermMemory: ctx.hasLongTermMemory,
+          memoryPrompt: ctx.memoryPrompt,
+        };
+        const sendMessages = ctx.messages.concat(userMessage);
         const messageIndex = session.messages.length + 2;
 
         // save user's and bot's message immediately so UI shows them
@@ -715,7 +731,7 @@ export const useChatStore = createPersistStore(
         }
       },
 
-      async getMessagesWithMemory() {
+      async getMessagesWithMemoryContext() {
         const session = get().currentSession();
         const modelConfig = session.mask.modelConfig;
         const clearContextIndex = session.clearContextIndex ?? 0;
@@ -743,7 +759,7 @@ export const useChatStore = createPersistStore(
         // long term memory
         const shouldSendLongTermMemory =
           modelConfig.sendMemory &&
-          session.memoryPrompt &&
+          !!session.memoryPrompt &&
           session.memoryPrompt.length > 0 &&
           session.lastSummarizeIndex > clearContextIndex;
         const longTermMemoryPrompts =
@@ -756,25 +772,18 @@ export const useChatStore = createPersistStore(
           totalMessageCount - modelConfig.historyMessageCount,
         );
 
-        // lets concat send messages, including 4 parts:
-        // 0. system prompt: to get close to OpenAI Web ChatGPT
-        // 1. long term memory: summarized memory messages
-        // 2. pre-defined in-context prompts
-        // 3. short term memory: latest n messages
-        // 4. newest input message
+        // keep same start-index semantics with getMessagesWithMemory
         const memoryStartIndex = shouldSendLongTermMemory
           ? Math.min(longTermMemoryStartIndex, shortTermMemoryStartIndex)
           : shortTermMemoryStartIndex;
-        // and if user has cleared history messages, we should exclude the memory too.
         const contextStartIndex = Math.max(clearContextIndex, memoryStartIndex);
-        // 使用模型实际的输入窗口容量（而非 max_tokens 输出限制）作为截断阈值
+
         const maxTokenThreshold = getAvailableContextTokens(
           modelConfig.model,
           modelConfig.max_tokens,
         );
 
-        // get recent messages as much as possible
-        const reversedRecentMessages = [];
+        const reversedRecentMessages: ChatMessage[] = [];
         for (
           let i = totalMessageCount - 1, tokenCount = 0;
           i >= contextStartIndex && tokenCount < maxTokenThreshold;
@@ -785,7 +794,7 @@ export const useChatStore = createPersistStore(
           tokenCount += estimateTokenLength(getMessageTextContent(msg));
           reversedRecentMessages.push(msg);
         }
-        // concat all messages
+
         const recentMessages = [
           ...systemPrompts,
           ...longTermMemoryPrompts,
@@ -793,7 +802,18 @@ export const useChatStore = createPersistStore(
           ...reversedRecentMessages.reverse(),
         ];
 
-        return recentMessages;
+        return {
+          messages: recentMessages,
+          sentHistoryCount: reversedRecentMessages.length,
+          contextPromptsCount: contextPrompts.length,
+          hasLongTermMemory: shouldSendLongTermMemory,
+          memoryPrompt: shouldSendLongTermMemory ? session.memoryPrompt : "",
+        };
+      },
+
+      async getMessagesWithMemory() {
+        const ctx = await get().getMessagesWithMemoryContext();
+        return ctx.messages;
       },
 
       updateMessage(
@@ -824,7 +844,7 @@ export const useChatStore = createPersistStore(
         const modelConfig = session.mask.modelConfig;
         // skip summarize when using dalle3?
         if (isDalle3(modelConfig.model)) {
-          return;
+          return Promise.resolve();
         }
 
         // if not config compressModel, then using getSummarizeModel
@@ -993,6 +1013,7 @@ export const useChatStore = createPersistStore(
             },
           });
         }
+        return Promise.resolve();
       },
 
       updateStat(message: ChatMessage, session: ChatSession) {

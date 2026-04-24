@@ -1862,6 +1862,8 @@ function _Chat() {
                     // 计算发送该消息时携带的上下文信息
                     const msgContextInfo = (() => {
                       if (!isUser || isContext) return null;
+                      // 优先使用发送时写入的真实上下文信息
+                      if (message.contextInfo) return message.contextInfo;
                       const modelConfig = session.mask.modelConfig;
                       const clearIdx = session.clearContextIndex ?? 0;
                       // i 是在 messages（含 context）中的索引，需要换算成 session.messages 中的索引
