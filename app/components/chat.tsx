@@ -1036,6 +1036,7 @@ function _Chat() {
 
   const [showExport, setShowExport] = useState(false);
   const [showModelSelector, setShowModelSelector] = useState(false);
+  const [isTitleLoading, setIsTitleLoading] = useState(false);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [userInput, setUserInput] = useState("");
@@ -1681,8 +1682,9 @@ function _Chat() {
           <div className="window-actions">
             <div className="window-action-button">
               <IconButton
-                icon={<ReloadIcon />}
+                icon={isTitleLoading ? <LoadingButtonIcon /> : <ReloadIcon />}
                 bordered
+                disabled={isTitleLoading}
                 title={Locale.Chat.Actions.RefreshTitle}
                 onClick={async () => {
                   if (
@@ -1691,8 +1693,17 @@ function _Chat() {
                   ) {
                     return;
                   }
-                  showToast(Locale.Chat.Actions.RefreshToast);
-                  chatStore.summarizeSession(true, session);
+                  setIsTitleLoading(true);
+                  const timeout = setTimeout(
+                    () => setIsTitleLoading(false),
+                    15000,
+                  );
+                  try {
+                    await chatStore.summarizeSession(true, session);
+                  } finally {
+                    clearTimeout(timeout);
+                    setIsTitleLoading(false);
+                  }
                 }}
               />
             </div>

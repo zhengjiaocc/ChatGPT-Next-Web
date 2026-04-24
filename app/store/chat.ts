@@ -818,7 +818,7 @@ export const useChatStore = createPersistStore(
       summarizeSession(
         refreshTitle: boolean = false,
         targetSession: ChatSession,
-      ) {
+      ): Promise<void> {
         const config = useAppConfig.getState();
         const session = targetSession;
         const modelConfig = session.mask.modelConfig;
@@ -880,43 +880,45 @@ export const useChatStore = createPersistStore(
               }),
             );
           const normalizedTopicMessages = normalizeMessages(topicMessages);
-          api.llm.chat({
-            messages: normalizedTopicMessages,
-            config: {
-              model,
-              stream: false,
-              providerName,
-              providerId: modelConfig.compressModel
-                ? modelConfig.compressProviderId
-                : modelConfig.providerId,
-            },
-            onFinish(message, responseRes) {
-              if (
-                message &&
-                (responseRes == null || responseRes.status === 200)
-              ) {
-                let topic = message;
-                // handle JSON response like {"cause":{"name":"..."}}
-                try {
-                  const parsed = JSON.parse(
-                    message.replace(/^```json\s*|```$/g, "").trim(),
-                  );
-                  topic =
-                    parsed?.cause?.name ??
-                    parsed?.name ??
-                    parsed?.title ??
-                    message;
-                } catch {}
-                get().updateTargetSession(session, (session) => {
-                  session.topic =
-                    topic.length > 0 ? trimTopic(topic) : DEFAULT_TOPIC;
-                  session.customTopic = false;
-                });
-              }
-            },
-            onError() {
-              // silently ignore title generation errors
-            },
+          return new Promise<void>((resolve) => {
+            api.llm.chat({
+              messages: normalizedTopicMessages,
+              config: {
+                model,
+                stream: false,
+                providerName,
+                providerId: modelConfig.compressModel
+                  ? modelConfig.compressProviderId
+                  : modelConfig.providerId,
+              },
+              onFinish(message, responseRes) {
+                if (
+                  message &&
+                  (responseRes == null || responseRes.status === 200)
+                ) {
+                  let topic = message;
+                  try {
+                    const parsed = JSON.parse(
+                      message.replace(/^```json\s*|```$/g, "").trim(),
+                    );
+                    topic =
+                      parsed?.cause?.name ??
+                      parsed?.name ??
+                      parsed?.title ??
+                      message;
+                  } catch {}
+                  get().updateTargetSession(session, (session) => {
+                    session.topic =
+                      topic.length > 0 ? trimTopic(topic) : DEFAULT_TOPIC;
+                    session.customTopic = false;
+                  });
+                }
+                resolve();
+              },
+              onError() {
+                resolve();
+              },
+            });
           });
         }
         const summarizeIndex = Math.max(
