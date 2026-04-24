@@ -1064,6 +1064,7 @@ function _Chat() {
   const fontFamily = config.fontFamily;
 
   const [showExport, setShowExport] = useState(false);
+  const [showMemoryHistory, setShowMemoryHistory] = useState(false);
   const [showModelSelector, setShowModelSelector] = useState(false);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -1731,6 +1732,16 @@ function _Chat() {
                 />
               </div>
             )}
+            {(session.memoryHistory?.length ?? 0) > 0 && (
+              <div className="window-action-button">
+                <IconButton
+                  icon={<BrainIcon />}
+                  bordered
+                  title={`压缩历史 (${session.memoryHistory.length})`}
+                  onClick={() => setShowMemoryHistory(true)}
+                />
+              </div>
+            )}
             <div className="window-action-button">
               <IconButton
                 icon={<ExportIcon />}
@@ -2134,6 +2145,32 @@ function _Chat() {
       </div>
       {showExport && (
         <ExportMessageModal onClose={() => setShowExport(false)} />
+      )}
+      {showMemoryHistory && (
+        <Modal
+          title={`压缩历史记录 (${session.memoryHistory?.length ?? 0} 条)`}
+          onClose={() => setShowMemoryHistory(false)}
+        >
+          <div
+            style={{ maxHeight: "60vh", overflowY: "auto", padding: "0 16px" }}
+          >
+            {(session.memoryHistory ?? []).map((h, i) => (
+              <div key={i} style={{ marginBottom: 16 }}>
+                <div
+                  style={{
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                    opacity: 0.6,
+                    fontSize: 12,
+                  }}
+                >
+                  #{i + 1}
+                </div>
+                <div style={{ whiteSpace: "pre-wrap", fontSize: 13 }}>{h}</div>
+              </div>
+            ))}
+          </div>
+        </Modal>
       )}
 
       {isEditingMessage && (

@@ -105,6 +105,7 @@ export interface ChatSession {
   customTopic?: boolean;
 
   memoryPrompt: string;
+  memoryHistory: string[];
   messages: ChatMessage[];
   stat: ChatStat;
   lastUpdate: number;
@@ -127,6 +128,7 @@ function createEmptySession(): ChatSession {
     id: nanoid(),
     topic: DEFAULT_TOPIC,
     memoryPrompt: "",
+    memoryHistory: [],
     messages: [],
     messagesLoaded: true,
     stat: {
@@ -994,11 +996,15 @@ export const useChatStore = createPersistStore(
               session.memoryPrompt = message;
             },
             onFinish(message, responseRes) {
-              if (message) {
+              if (message && !message.includes('"error"')) {
                 console.log("[Memory] ", message);
                 get().updateTargetSession(session, (session) => {
                   session.lastSummarizeIndex = session.messages.length;
                   session.memoryPrompt = message;
+                  session.memoryHistory = [
+                    ...(session.memoryHistory ?? []),
+                    message,
+                  ];
                 });
               }
             },
