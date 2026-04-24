@@ -25,7 +25,8 @@
       "Bash(grep -rn \"animation:\" app/components/*.module.scss app/styles/*.scss)",
       "Bash(git restore:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npx eslint:*)"
     ]
   }
 }
