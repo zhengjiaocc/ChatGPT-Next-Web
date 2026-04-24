@@ -250,7 +250,8 @@ export function SideBar(props: { className?: string }) {
   const config = useAppConfig();
   const chatStore = useChatStore();
   const providerStore = useProviderStore();
-  const hasEnabledProvider = providerStore.providers.some((p) => p.enabled);
+  const hasEnabledProvider =
+    chatStore.dbLoaded && providerStore.providers.some((p) => p.enabled);
   const [mcpEnabled, setMcpEnabled] = useState(false);
 
   useEffect(() => {
