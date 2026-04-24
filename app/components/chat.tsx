@@ -506,6 +506,7 @@ export function ChatActions(props: {
   setShowChatSidePanel: React.Dispatch<React.SetStateAction<boolean>>;
   setShowModelSelector: React.Dispatch<React.SetStateAction<boolean>>;
   showModelSelector: boolean;
+  onShowMemoryHistory?: () => void;
 }) {
   const config = useAppConfig();
   const navigate = useNavigate();
@@ -700,6 +701,15 @@ export function ChatActions(props: {
           text={currentModelName}
           icon={<RobotIcon />}
         />
+
+        {props.onShowMemoryHistory && (
+          <ChatAction
+            key="memory-history"
+            onClick={props.onShowMemoryHistory}
+            text="压缩历史"
+            icon={<BrainIcon />}
+          />
+        )}
 
         {props.showModelSelector && (
           <ModelSelector
@@ -2065,6 +2075,11 @@ function _Chat() {
                 setShowChatSidePanel={setShowChatSidePanel}
                 setShowModelSelector={setShowModelSelector}
                 showModelSelector={showModelSelector}
+                onShowMemoryHistory={
+                  (session.memoryHistory?.length ?? 0) > 0
+                    ? () => setShowMemoryHistory(true)
+                    : undefined
+                }
               />
               <label
                 className={clsx(styles["chat-input-panel-inner"], {
