@@ -57,6 +57,8 @@ export const DEFAULT_CONFIG = {
 
   enableCodeFold: true, // code fold config
 
+  showMemoryHistoryButton: false, // always show memory history button
+
   disablePromptHint: false,
 
   dontShowMaskSplashScreen: false, // dont show splash screen when create chat

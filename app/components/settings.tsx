@@ -7,17 +7,10 @@ import AddIcon from "../icons/add.svg";
 import CloseIcon from "../icons/close.svg";
 import CopyIcon from "../icons/copy.svg";
 import ClearIcon from "../icons/clear.svg";
-import LoadingIcon from "../icons/three-dots.svg";
 import EditIcon from "../icons/edit.svg";
 import EyeIcon from "../icons/eye.svg";
-import DownloadIcon from "../icons/download.svg";
-import UploadIcon from "../icons/upload.svg";
 import ConfigIcon from "../icons/config.svg";
-import ConfirmIcon from "../icons/confirm.svg";
 
-import ConnectionIcon from "../icons/connection.svg";
-import CloudSuccessIcon from "../icons/cloud-success.svg";
-import CloudFailIcon from "../icons/cloud-fail.svg";
 import {
   Input,
   List,
@@ -48,27 +41,17 @@ import Locale, {
   changeLang,
   getLang,
 } from "../locales";
-import { copyToClipboard, semverCompare } from "../utils";
-import {
-  OPENAI_BASE_URL,
-  Path,
-  RELEASE_URL,
-  STORAGE_KEY,
-  ServiceProvider,
-  SlotID,
-  UPDATE_URL,
-} from "../constant";
+import { copyToClipboard } from "../utils";
+import { Path, SlotID } from "../constant";
 import { Prompt, SearchService, usePromptStore } from "../store/prompt";
 import { ErrorBoundary } from "./error";
 import { InputRange } from "./input-range";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarPicker } from "./emoji";
 import { getClientConfig } from "../config/client";
-import { useSyncStore } from "../store/sync";
 import { nanoid } from "nanoid";
-import { useMaskStore } from "../store/mask";
 import { useProviderStore } from "../store/provider";
- // 旧的 provider type 已删除
+// 旧的 provider type 已删除
 
 import { RealtimeConfigList } from "./realtime-chat/realtime-config";
 
@@ -737,14 +720,27 @@ export function Settings() {
               }
             ></input>
           </ListItem>
+          <ListItem
+            title="常驻摘要历史按钮"
+            subTitle="在底部工具栏始终显示压缩历史按钮"
+          >
+            <input
+              aria-label="常驻摘要历史按钮"
+              type="checkbox"
+              checked={config.showMemoryHistoryButton}
+              onChange={(e) =>
+                updateConfig(
+                  (config) =>
+                    (config.showMemoryHistoryButton = e.currentTarget.checked),
+                )
+              }
+            ></input>
+          </ListItem>
         </List>
 
         {/* 模型提供商配置 */}
         <List>
-          <ListItem
-            title="模型提供商"
-            subTitle="管理 API 供应商及其可用模型"
-          >
+          <ListItem title="模型提供商" subTitle="管理 API 供应商及其可用模型">
             <IconButton
               icon={<ConfigIcon />}
               text="配置供应商"
@@ -819,7 +815,6 @@ export function Settings() {
             }}
           />
         </List>
-
 
         <DangerItems />
 

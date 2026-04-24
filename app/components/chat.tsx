@@ -2076,6 +2076,7 @@ function _Chat() {
                 setShowModelSelector={setShowModelSelector}
                 showModelSelector={showModelSelector}
                 onShowMemoryHistory={
+                  config.showMemoryHistoryButton ||
                   (session.memoryHistory?.length ?? 0) > 0
                     ? () => setShowMemoryHistory(true)
                     : undefined
