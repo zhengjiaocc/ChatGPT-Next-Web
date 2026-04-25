@@ -504,6 +504,7 @@ export function ChatActions(props: {
   const pluginStore = usePluginStore();
   const providerStore = useProviderStore();
   const session = chatStore.currentSession();
+  const isSummarizing = chatStore.summarizingIds?.includes(session.id) ?? false;
 
   // switch themes
   const theme = config.theme;
@@ -660,7 +661,15 @@ export function ChatActions(props: {
             key="memory-history"
             onClick={() => props.onShowMemoryHistory?.()}
             text="压缩历史"
-            icon={<BrainIcon />}
+            icon={
+              <span
+                className={
+                  isSummarizing ? styles["brain-summarizing"] : undefined
+                }
+              >
+                <BrainIcon />
+              </span>
+            }
           />
         )}
 

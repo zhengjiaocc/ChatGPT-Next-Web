@@ -1,5 +1,14 @@
 @import "../styles/animation.scss";
 
+@keyframes brain-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.15); }
+}
+
+.brain-summarizing {
+  animation: brain-pulse 1.2s ease-in-out infinite;
+}
+
 .attach-images {
   position: absolute;
   left: 30px;

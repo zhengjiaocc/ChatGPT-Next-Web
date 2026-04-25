@@ -253,6 +253,7 @@ const SESSION_SYNC_DEBOUNCE_MS = 500;
 const sessionSyncTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingSessionSyncPayload = new Map<string, SessionSyncPayload>();
 const sessionSyncRunning = new Map<string, boolean>();
+export const summarizingSessionIds = new Set<string>();
 let syncFlushEventsInstalled = false;
 
 function clearAllSessionSyncTasks() {
@@ -513,6 +514,7 @@ const DEFAULT_CHAT_STATE = {
   currentSessionIndex: 0,
   lastInput: "",
   hiddenSessionIds: [] as string[],
+  summarizingIds: [] as string[],
   dbLoaded: false,
   dbLoadState: "idle" as "idle" | "loading" | "ready" | "error",
 };
@@ -1273,6 +1275,8 @@ export const useChatStore = createPersistStore(
           historyMsgLength > modelConfig.compressMessageLengthThreshold &&
           modelConfig.sendMemory
         ) {
+          summarizingSessionIds.add(session.id);
+          set((s) => ({ summarizingIds: [...s.summarizingIds, session.id] }));
           /** Destruct max_tokens while summarizing
            * this param is just shit
            **/
@@ -1299,6 +1303,12 @@ export const useChatStore = createPersistStore(
               session.memoryPrompt = message;
             },
             onFinish(message, responseRes) {
+              summarizingSessionIds.delete(session.id);
+              set((s) => ({
+                summarizingIds: s.summarizingIds.filter(
+                  (id) => id !== session.id,
+                ),
+              }));
               if (message && !message.includes('"error"')) {
                 console.log("[Memory] ", message);
                 get().updateTargetSession(session, (session) => {
@@ -1320,6 +1330,12 @@ export const useChatStore = createPersistStore(
               }
             },
             onError(err) {
+              summarizingSessionIds.delete(session.id);
+              set((s) => ({
+                summarizingIds: s.summarizingIds.filter(
+                  (id) => id !== session.id,
+                ),
+              }));
               console.error("[Summarize] ", err);
             },
           });
