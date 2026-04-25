@@ -221,6 +221,75 @@ export function SessionConfigModel(props: { onClose: () => void }) {
   );
 }
 
+function MemoryHistoryItem(props: {
+  entry: {
+    summary: string;
+    fromIndex: number;
+    toIndex: number;
+    isUpdate: boolean;
+    createdAt: number;
+  };
+  index: number;
+  isLatest: boolean;
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(props.defaultOpen);
+  const { entry, index, isLatest } = props;
+  return (
+    <div style={{ borderBottom: "var(--border-in-light) 1px solid" }}>
+      <div
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "10px 20px",
+          cursor: "pointer",
+          userSelect: "none",
+          background: open ? "var(--hover-color)" : undefined,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 14, fontWeight: 500 }}>
+            第 {index} 次压缩
+          </span>
+          <span style={{ fontSize: 12, opacity: 0.45 }}>
+            {entry.isUpdate ? "合并更新" : "首次"} · 消息 {entry.fromIndex}–
+            {entry.toIndex}
+          </span>
+          {isLatest && (
+            <span style={{ fontSize: 11, color: "var(--primary)" }}>最新</span>
+          )}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 11,
+            opacity: 0.4,
+          }}
+        >
+          {entry.createdAt > 0 && new Date(entry.createdAt).toLocaleString()}
+          <span>{open ? "▲" : "▼"}</span>
+        </div>
+      </div>
+      {open && (
+        <div
+          style={{
+            padding: "8px 20px 16px",
+            fontSize: 13,
+            lineHeight: 1.6,
+            borderTop: "var(--border-in-light) 1px solid",
+          }}
+        >
+          <Markdown content={entry.summary} fontSize={13} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PromptToast(props: {
   showToast?: boolean;
   showModal?: boolean;
@@ -663,6 +732,7 @@ export function ChatActions(props: {
             text="压缩历史"
             icon={
               <span
+                style={{ display: "inline-flex", alignItems: "center" }}
                 className={
                   isSummarizing ? styles["brain-summarizing"] : undefined
                 }
@@ -2305,13 +2375,9 @@ function _Chat() {
                       session.memoryHistory?.length ?? 0
                     } 条)`,
                     children: (
-                      <div
-                        style={{
-                          padding: "0 16px",
-                        }}
-                      >
+                      <div>
                         {(session.memoryHistory ?? []).length === 0 ? (
-                          <div style={{ opacity: 0.5, padding: "16px 0" }}>
+                          <div style={{ opacity: 0.5, padding: "16px" }}>
                             暂无压缩记录
                           </div>
                         ) : (
@@ -2330,95 +2396,13 @@ function _Chat() {
                                     }
                                   : (h as any);
                               return (
-                                <div
+                                <MemoryHistoryItem
                                   key={i}
-                                  style={{
-                                    marginBottom: 16,
-                                    border: "2px solid var(--border-in-light)",
-                                    borderRadius: 10,
-                                    background: "var(--white)",
-                                    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-                                  }}
-                                >
-                                  <details open={i === 0}>
-                                    <summary
-                                      style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        padding: "12px 16px",
-                                        fontSize: 13,
-                                        cursor: "pointer",
-                                        listStyle: "none",
-                                        background: "var(--second)",
-                                        borderRadius: "8px 8px 0 0",
-                                      }}
-                                    >
-                                      <span style={{ fontWeight: "bold" }}>
-                                        第 {arr.length - i} 次压缩
-                                        <span
-                                          style={{
-                                            fontWeight: "normal",
-                                            opacity: 0.6,
-                                            marginLeft: 6,
-                                          }}
-                                        >
-                                          {entry.isUpdate ? "合并更新" : "首次"}
-                                        </span>
-                                        {(entry.toIndex > 0 ||
-                                          entry.fromIndex >= 0) && (
-                                          <span
-                                            style={{
-                                              fontWeight: "normal",
-                                              opacity: 0.6,
-                                              marginLeft: 8,
-                                              fontSize: 12,
-                                            }}
-                                          >
-                                            · 消息 {entry.fromIndex}–
-                                            {entry.toIndex}
-                                          </span>
-                                        )}
-                                      </span>
-                                      <span
-                                        style={{
-                                          opacity: 0.5,
-                                          fontSize: 11,
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: 8,
-                                        }}
-                                      >
-                                        {entry.createdAt > 0 &&
-                                          new Date(
-                                            entry.createdAt,
-                                          ).toLocaleString()}
-                                        {i === 0 && (
-                                          <span
-                                            style={{
-                                              color: "var(--primary)",
-                                              fontWeight: "bold",
-                                            }}
-                                          >
-                                            最新
-                                          </span>
-                                        )}
-                                      </span>
-                                    </summary>
-                                    <div
-                                      style={{
-                                        fontSize: 13,
-                                        lineHeight: 1.6,
-                                        padding: "12px 16px",
-                                      }}
-                                    >
-                                      <Markdown
-                                        content={entry.summary}
-                                        fontSize={13}
-                                      />
-                                    </div>
-                                  </details>
-                                </div>
+                                  entry={entry}
+                                  index={arr.length - i}
+                                  isLatest={i === 0}
+                                  defaultOpen={i === 0}
+                                />
                               );
                             })
                         )}
