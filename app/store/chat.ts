@@ -1278,7 +1278,7 @@ export const useChatStore = createPersistStore(
             messages: normalizeMessages(
               toBeSummarizedMsgs.concat(
                 createMessage({
-                  role: "system",
+                  role: "user",
                   content: hasExistingMemory
                     ? Locale.Store.Prompt.SummarizeWithMemory
                     : Locale.Store.Prompt.Summarize,

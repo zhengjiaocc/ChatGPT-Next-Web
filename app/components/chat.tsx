@@ -214,56 +214,7 @@ export function SessionConfigModel(props: { onClose: () => void }) {
             );
           }}
           shouldSyncFromGlobal
-          extraListItems={
-            session.mask.modelConfig.sendMemory ? (
-              <>
-                <ListItem
-                  className="copyable"
-                  title={`${Locale.Memory.Title} (${session.lastSummarizeIndex} of ${session.messages.length})`}
-                  subTitle={session.memoryPrompt || Locale.Memory.EmptyContent}
-                ></ListItem>
-                {(session.memoryHistory ?? []).length > 0 && (
-                  <ListItem
-                    title={`历史摘要记录（共 ${session.memoryHistory.length} 轮）`}
-                    subTitle=""
-                  >
-                    <div style={{ width: "100%" }}>
-                      {session.memoryHistory.map((h, i) => (
-                        <details key={i} style={{ marginBottom: 6 }}>
-                          <summary
-                            style={{
-                              cursor: "pointer",
-                              fontSize: 13,
-                              opacity: 0.7,
-                            }}
-                          >
-                            第 {i + 1} 轮摘要
-                            {h.isUpdate ? "（合并）" : "（首次）"}
-                            {h.toIndex > 0 &&
-                              ` · 消息 ${h.fromIndex}–${h.toIndex}`}
-                          </summary>
-                          <div
-                            style={{
-                              whiteSpace: "pre-wrap",
-                              fontSize: 12,
-                              padding: "6px 8px",
-                              background: "var(--second)",
-                              borderRadius: 6,
-                              marginTop: 4,
-                            }}
-                          >
-                            {h.summary}
-                          </div>
-                        </details>
-                      ))}
-                    </div>
-                  </ListItem>
-                )}
-              </>
-            ) : (
-              <></>
-            )
-          }
+          extraListItems={<></>}
         ></MaskConfig>
       </Modal>
     </div>
