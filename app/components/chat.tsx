@@ -238,6 +238,9 @@ export function SessionConfigModel(props: { onClose: () => void }) {
                             }}
                           >
                             第 {i + 1} 轮摘要
+                            {h.isUpdate ? "（合并）" : "（首次）"}
+                            {h.toIndex > 0 &&
+                              ` · 消息 ${h.fromIndex}–${h.toIndex}`}
                           </summary>
                           <div
                             style={{
@@ -249,7 +252,7 @@ export function SessionConfigModel(props: { onClose: () => void }) {
                               marginTop: 4,
                             }}
                           >
-                            {h}
+                            {h.summary}
                           </div>
                         </details>
                       ))}
@@ -2351,49 +2354,84 @@ function _Chat() {
                           (session.memoryHistory ?? [])
                             .slice()
                             .reverse()
-                            .map((h, i, arr) => (
-                              <div
-                                key={i}
-                                style={{
-                                  marginBottom: 12,
-                                  border: "1px solid var(--border-in-light)",
-                                  borderRadius: 8,
-                                  padding: "10px 14px",
-                                  background: "var(--white)",
-                                }}
-                              >
+                            .map((h, i, arr) => {
+                              const entry =
+                                typeof h === "string"
+                                  ? {
+                                      summary: h,
+                                      fromIndex: 0,
+                                      toIndex: 0,
+                                      isUpdate: false,
+                                      createdAt: 0,
+                                    }
+                                  : (h as any);
+                              return (
                                 <div
+                                  key={i}
                                   style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    marginBottom: 8,
-                                    fontSize: 12,
-                                    opacity: 0.5,
+                                    marginBottom: 12,
+                                    border: "1px solid var(--border-in-light)",
+                                    borderRadius: 8,
+                                    background: "var(--white)",
                                   }}
                                 >
-                                  <span>第 {arr.length - i} 次压缩</span>
-                                  {i === 0 && (
-                                    <span
+                                  <details open={i === 0}>
+                                    <summary
                                       style={{
-                                        color: "var(--primary)",
-                                        opacity: 1,
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        padding: "10px 14px",
+                                        fontSize: 12,
+                                        cursor: "pointer",
+                                        listStyle: "none",
                                       }}
                                     >
-                                      最新
-                                    </span>
-                                  )}
+                                      <span style={{ fontWeight: "bold" }}>
+                                        第 {arr.length - i} 次压缩
+                                        {entry.isUpdate
+                                          ? "（合并更新）"
+                                          : "（首次）"}
+                                      </span>
+                                      <span
+                                        style={{ opacity: 0.5, fontSize: 11 }}
+                                      >
+                                        {entry.fromIndex > 0 &&
+                                          `消息 ${entry.fromIndex}–${entry.toIndex}`}
+                                        {entry.createdAt > 0 &&
+                                          `  ${new Date(
+                                            entry.createdAt,
+                                          ).toLocaleString()}`}
+                                        {i === 0 && (
+                                          <span
+                                            style={{
+                                              color: "var(--primary)",
+                                              marginLeft: 8,
+                                            }}
+                                          >
+                                            最新
+                                          </span>
+                                        )}
+                                      </span>
+                                    </summary>
+                                    <div
+                                      style={{
+                                        fontSize: 13,
+                                        lineHeight: 1.6,
+                                        padding: "0 14px 10px",
+                                        borderTop:
+                                          "1px solid var(--border-in-light)",
+                                      }}
+                                    >
+                                      <Markdown
+                                        content={entry.summary}
+                                        fontSize={13}
+                                      />
+                                    </div>
+                                  </details>
                                 </div>
-                                <div
-                                  style={{
-                                    whiteSpace: "pre-wrap",
-                                    fontSize: 13,
-                                    lineHeight: 1.6,
-                                  }}
-                                >
-                                  {h}
-                                </div>
-                              </div>
-                            ))
+                              );
+                            })
                         )}
                       </div>
                     ),

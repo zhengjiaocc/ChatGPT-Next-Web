@@ -112,13 +112,21 @@ export interface ChatStat {
   charCount: number;
 }
 
+export interface MemoryHistoryEntry {
+  summary: string;
+  fromIndex: number;
+  toIndex: number;
+  isUpdate: boolean;
+  createdAt: number;
+}
+
 export interface ChatSession {
   id: string;
   topic: string;
   customTopic?: boolean;
 
   memoryPrompt: string;
-  memoryHistory: string[];
+  memoryHistory: MemoryHistoryEntry[];
   messages: ChatMessage[];
   stat: ChatStat;
   lastUpdate: number;
@@ -237,7 +245,7 @@ type SessionSyncPayload = {
   model: string;
   mask: Mask;
   memoryPrompt: string;
-  memoryHistory: string[];
+  memoryHistory: MemoryHistoryEntry[];
   lastSummarizeIndex: number;
 };
 
@@ -1297,7 +1305,13 @@ export const useChatStore = createPersistStore(
                   session.memoryPrompt = message;
                   session.memoryHistory = [
                     ...(session.memoryHistory ?? []),
-                    message,
+                    {
+                      summary: message,
+                      fromIndex: summarizeIndex,
+                      toIndex: summarizeIndex + realMsgCount,
+                      isUpdate: hasExistingMemory,
+                      createdAt: Date.now(),
+                    },
                   ];
                 });
               }
