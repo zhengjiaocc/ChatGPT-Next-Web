@@ -216,11 +216,47 @@ export function SessionConfigModel(props: { onClose: () => void }) {
           shouldSyncFromGlobal
           extraListItems={
             session.mask.modelConfig.sendMemory ? (
-              <ListItem
-                className="copyable"
-                title={`${Locale.Memory.Title} (${session.lastSummarizeIndex} of ${session.messages.length})`}
-                subTitle={session.memoryPrompt || Locale.Memory.EmptyContent}
-              ></ListItem>
+              <>
+                <ListItem
+                  className="copyable"
+                  title={`${Locale.Memory.Title} (${session.lastSummarizeIndex} of ${session.messages.length})`}
+                  subTitle={session.memoryPrompt || Locale.Memory.EmptyContent}
+                ></ListItem>
+                {(session.memoryHistory ?? []).length > 0 && (
+                  <ListItem
+                    title={`历史摘要记录（共 ${session.memoryHistory.length} 轮）`}
+                    subTitle=""
+                  >
+                    <div style={{ width: "100%" }}>
+                      {session.memoryHistory.map((h, i) => (
+                        <details key={i} style={{ marginBottom: 6 }}>
+                          <summary
+                            style={{
+                              cursor: "pointer",
+                              fontSize: 13,
+                              opacity: 0.7,
+                            }}
+                          >
+                            第 {i + 1} 轮摘要
+                          </summary>
+                          <div
+                            style={{
+                              whiteSpace: "pre-wrap",
+                              fontSize: 12,
+                              padding: "6px 8px",
+                              background: "var(--second)",
+                              borderRadius: 6,
+                              marginTop: 4,
+                            }}
+                          >
+                            {h}
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  </ListItem>
+                )}
+              </>
             ) : (
               <></>
             )
@@ -1690,9 +1726,9 @@ function _Chat() {
                   className={homeStyles["skeleton-item"]}
                   style={{
                     height: 18,
-                    width: 112,
-                    minWidth: 88,
-                    maxWidth: "min(32vw, 160px)",
+                    width: 80,
+                    minWidth: 60,
+                    maxWidth: "min(24vw, 120px)",
                     flexShrink: 0,
                     color: "transparent",
                   }}
@@ -1711,9 +1747,9 @@ function _Chat() {
                   className={homeStyles["skeleton-item"]}
                   style={{
                     height: 14,
-                    width: "min(42vw, 192px)",
-                    minWidth: 112,
-                    maxWidth: 208,
+                    width: "min(28vw, 100px)",
+                    minWidth: 60,
+                    maxWidth: 100,
                     marginTop: 6,
                     flexShrink: 0,
                     color: "transparent",
