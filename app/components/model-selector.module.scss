@@ -21,7 +21,7 @@
 .mask {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.5);
   z-index: 9999;
   display: flex;
   align-items: center;
@@ -33,17 +33,18 @@
   display: flex;
   flex-direction: column;
   background: var(--white);
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  width: 560px;
-  height: 480px;
+  box-shadow: var(--card-shadow);
+  width: min(92vw, 620px);
+  height: min(78vh, 520px);
+  max-height: calc(var(--full-height) - 32px);
   transition: width 0.25s ease;
   animation: panel-pop-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
   border: var(--border-in-light);
 
   &.list-mode {
-    width: 360px;
+    width: min(92vw, 420px);
   }
 }
 
@@ -148,6 +149,7 @@
 .list-body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .list-group-header {
@@ -316,6 +318,7 @@
 .right {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .model-item {
@@ -359,5 +362,33 @@
   .dot {
     animation: none;
     transition: none;
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .mask {
+    align-items: flex-end;
+  }
+
+  .container {
+    width: 100vw;
+    height: min(78vh, calc(var(--full-height) - 12px));
+    max-height: calc(var(--full-height) - 12px);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-left: none;
+    border-right: none;
+
+    &.list-mode {
+      width: 100vw;
+    }
+  }
+
+  .header {
+    padding: 12px;
+  }
+
+  .header-title {
+    display: none;
   }
 }

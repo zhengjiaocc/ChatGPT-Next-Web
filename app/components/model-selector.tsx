@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Avatar } from "./emoji";
 import { PROVIDER_ICON_MODEL } from "../utils/provider-icons";
 import LeftIcon from "../icons/left.svg";
 import clsx from "clsx";
 import styles from "./model-selector.module.scss";
+import { useMobileScreen } from "../utils";
 
 interface ProviderGroup {
   provider: string;
@@ -17,6 +18,7 @@ export function ModelSelector(props: {
   onSelect: (value: string) => void;
   onClose: () => void;
 }) {
+  const isMobileScreen = useMobileScreen();
   const [activeProvider, setActiveProvider] = useState(
     props.groups.find((g) =>
       g.models.some((m) => {
@@ -30,11 +32,17 @@ export function ModelSelector(props: {
       }),
     )?.provider ?? props.groups[0]?.provider,
   );
-  const [splitView, setSplitView] = useState(true);
+  const [splitView, setSplitView] = useState(!isMobileScreen);
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(
     new Set(),
   );
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (isMobileScreen) {
+      setSplitView(false);
+    }
+  }, [isMobileScreen]);
 
   const activeGroup = props.groups.find((g) => g.provider === activeProvider);
   const filteredModels = search
