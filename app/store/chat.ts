@@ -1000,8 +1000,10 @@ export const useChatStore = createPersistStore(
 
       getMemoryPrompt() {
         const session = get().currentSession();
-
-        if (session.memoryPrompt.length) {
+        if (
+          session.memoryPrompt.length &&
+          session.lastSummarizeIndex <= session.messages.length
+        ) {
           return {
             role: "system",
             content: Locale.Store.Prompt.History(session.memoryPrompt),
@@ -1040,7 +1042,8 @@ export const useChatStore = createPersistStore(
           modelConfig.sendMemory &&
           !!session.memoryPrompt &&
           session.memoryPrompt.length > 0 &&
-          session.lastSummarizeIndex > clearContextIndex;
+          session.lastSummarizeIndex > clearContextIndex &&
+          session.lastSummarizeIndex <= totalMessageCount;
         const longTermMemoryPrompts =
           shouldSendLongTermMemory && memoryPrompt ? [memoryPrompt] : [];
 

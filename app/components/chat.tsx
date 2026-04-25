@@ -1283,11 +1283,15 @@ function _Chat() {
     const beforeMessages = session.messages.slice(0, userMessageIndex);
     chatStore.updateTargetSession(session, (s) => {
       s.messages = beforeMessages;
-      // Reset summarize index if it points beyond the truncation point
+      // Discard summaries that cover messages beyond the truncation point
       if (s.lastSummarizeIndex > userMessageIndex) {
-        s.lastSummarizeIndex = 0;
-        s.memoryPrompt = "";
-        s.memoryHistory = [];
+        const validHistory = (s.memoryHistory ?? []).filter(
+          (h) => h.toIndex <= userMessageIndex,
+        );
+        s.memoryHistory = validHistory;
+        const lastValid = validHistory[validHistory.length - 1];
+        s.memoryPrompt = lastValid?.summary ?? "";
+        s.lastSummarizeIndex = lastValid?.toIndex ?? 0;
       }
     });
     setIsLoading(true);
