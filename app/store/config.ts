@@ -259,7 +259,7 @@ export const useAppConfig = createPersistStore(
   }),
   {
     name: StoreKey.Config,
-    version: 4.6,
+    version: 4.7,
 
     merge(persistedState, currentState) {
       const state = persistedState as ChatConfig | undefined;
@@ -292,6 +292,11 @@ export const useAppConfig = createPersistStore(
         if (state.ttsConfig && !state.ttsConfig.providerId) {
           state.ttsConfig.providerId = "";
         }
+      }
+
+      if (version < 4.7) {
+        // Reset compress threshold to new default for 128k models
+        state.modelConfig.compressMessageLengthThreshold = 32000;
       }
 
       return state as any;
