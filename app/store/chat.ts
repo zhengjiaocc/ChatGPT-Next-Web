@@ -1340,33 +1340,6 @@ export const useChatStore = createPersistStore(
           set({ dbLoaded: true, dbLoadState: "ready" });
           return;
         }
-        const applyLocalSessions = (localSessions: ChatSession[]) => {
-          if (localSessions.length === 0) {
-            set({
-              sessions: [createEmptySession()],
-              dbLoaded: true,
-              dbLoadState: "ready",
-            });
-            return;
-          }
-          const sessions = sanitizeSessions(localSessions);
-          const prevCurrentId = get().currentSession()?.id;
-          const localCurrentIndex = prevCurrentId
-            ? sessions.findIndex((s) => s.id === prevCurrentId)
-            : -1;
-          set({
-            sessions,
-            currentSessionIndex: localCurrentIndex >= 0 ? localCurrentIndex : 0,
-            dbLoaded: true,
-            dbLoadState: "ready",
-          });
-          sessions.forEach((session) => {
-            if (isMeaningfulSession(session)) {
-              void syncSessionMessagesToDB(session, session.messages);
-              void syncSessionToDB(session);
-            }
-          });
-        };
         try {
           const res = await fetchWithTimeout("/api/sessions");
           if (res.status === 401) {
@@ -1388,7 +1361,11 @@ export const useChatStore = createPersistStore(
             isMeaningfulSession,
           );
           if (!Array.isArray(rows) || rows.length === 0) {
-            applyLocalSessions(localSessions);
+            set({
+              sessions: [createEmptySession()],
+              dbLoaded: true,
+              dbLoadState: "ready",
+            });
             return;
           }
           const filteredRows = rows.filter(
@@ -1399,7 +1376,11 @@ export const useChatStore = createPersistStore(
             .filter((r: any) => !filteredRows.includes(r))
             .forEach((r: any) => deleteSessionFromDB(r.id));
           if (!filteredRows.length) {
-            applyLocalSessions(localSessions);
+            set({
+              sessions: [createEmptySession()],
+              dbLoaded: true,
+              dbLoadState: "ready",
+            });
             return;
           }
           const hidden = new Set<string>(get().hiddenSessionIds ?? []);
@@ -1457,16 +1438,8 @@ export const useChatStore = createPersistStore(
               return session;
             });
 
-          // Cloud is authoritative. Only upload local-only sessions (not in cloud).
-          const cloudIds = new Set(cloudSessions.map((s) => s.id));
-          const localOnlySessions = localSessions.filter(
-            (s) => !cloudIds.has(s.id) && isMeaningfulSession(s),
-          );
-
-          const allSessions = sanitizeSessions([
-            ...cloudSessions,
-            ...localOnlySessions,
-          ]);
+          // Cloud is authoritative.
+          const allSessions = sanitizeSessions(cloudSessions);
 
           const prevCurrentId = get().currentSession()?.id;
           const mergedCurrentIndex = prevCurrentId
@@ -1478,11 +1451,6 @@ export const useChatStore = createPersistStore(
               mergedCurrentIndex >= 0 ? mergedCurrentIndex : 0,
             dbLoaded: true,
             dbLoadState: "ready",
-          });
-
-          // Upload local-only sessions to cloud.
-          localOnlySessions.forEach((session) => {
-            void syncSessionMessagesToDB(session, session.messages);
           });
 
           // 预取第一个 session 的消息，避免等待 React 渲染周期
