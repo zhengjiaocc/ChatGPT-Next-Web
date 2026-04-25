@@ -1293,6 +1293,12 @@ function _Chat() {
     const beforeMessages = session.messages.slice(0, userMessageIndex);
     chatStore.updateTargetSession(session, (s) => {
       s.messages = beforeMessages;
+      // Reset summarize index if it points beyond the truncation point
+      if (s.lastSummarizeIndex > userMessageIndex) {
+        s.lastSummarizeIndex = 0;
+        s.memoryPrompt = "";
+        s.memoryHistory = [];
+      }
     });
     setIsLoading(true);
     const textContent = getMessageTextContent(userMessage);
@@ -2105,15 +2111,12 @@ function _Chat() {
                                                         }}
                                                       >
                                                         携带的历史对话：
-                                                        {Math.floor(
-                                                          ((
-                                                            msgContextInfo.historyMessages ??
-                                                            []
-                                                          ).length ||
-                                                            msgContextInfo.sentCount) /
-                                                            2,
-                                                        )}{" "}
-                                                        轮
+                                                        {(
+                                                          msgContextInfo.historyMessages ??
+                                                          []
+                                                        ).length ||
+                                                          msgContextInfo.sentCount}{" "}
+                                                        条
                                                       </summary>
                                                       {(
                                                         msgContextInfo.historyMessages ??

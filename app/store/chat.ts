@@ -1035,19 +1035,17 @@ export const useChatStore = createPersistStore(
           session.lastSummarizeIndex > clearContextIndex;
         const longTermMemoryPrompts =
           shouldSendLongTermMemory && memoryPrompt ? [memoryPrompt] : [];
-        const longTermMemoryStartIndex = session.lastSummarizeIndex;
 
-        // short term memory
+        // short term memory: always take the last N messages regardless of summarization
         const shortTermMemoryStartIndex = Math.max(
           0,
           totalMessageCount - modelConfig.historyMessageCount,
         );
 
-        // keep same start-index semantics with getMessagesWithMemory
-        const memoryStartIndex = shouldSendLongTermMemory
-          ? Math.min(longTermMemoryStartIndex, shortTermMemoryStartIndex)
-          : shortTermMemoryStartIndex;
-        const contextStartIndex = Math.max(clearContextIndex, memoryStartIndex);
+        const contextStartIndex = Math.max(
+          clearContextIndex,
+          shortTermMemoryStartIndex,
+        );
 
         const maxTokenThreshold = getAvailableContextTokens(
           modelConfig.model,
@@ -1286,7 +1284,10 @@ export const useChatStore = createPersistStore(
               if (message && !message.includes('"error"')) {
                 console.log("[Memory] ", message);
                 get().updateTargetSession(session, (session) => {
-                  session.lastSummarizeIndex = session.messages.length;
+                  // Advance only to the end of summarized range, not messages.length,
+                  // so messages after the summarized range are still sent as short-term history.
+                  session.lastSummarizeIndex =
+                    summarizeIndex + toBeSummarizedMsgs.length;
                   session.memoryPrompt = message;
                   session.memoryHistory = [
                     ...(session.memoryHistory ?? []),
