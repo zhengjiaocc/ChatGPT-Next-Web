@@ -1241,10 +1241,15 @@ export const useChatStore = createPersistStore(
           toBeSummarizedMsgs = toBeSummarizedMsgs.slice(Math.max(0, n - 20));
         }
         const memoryPrompt = get().getMemoryPrompt();
+        const hasExistingMemory = !!memoryPrompt;
         if (memoryPrompt) {
-          // add memory prompt
+          // add memory prompt as context, but track real message count separately
           toBeSummarizedMsgs.unshift(memoryPrompt);
         }
+        // real message count excludes the virtual memoryPrompt message
+        const realMsgCount = hasExistingMemory
+          ? toBeSummarizedMsgs.length - 1
+          : toBeSummarizedMsgs.length;
 
         console.log(
           "[Chat History] ",
@@ -1266,7 +1271,9 @@ export const useChatStore = createPersistStore(
               toBeSummarizedMsgs.concat(
                 createMessage({
                   role: "system",
-                  content: Locale.Store.Prompt.Summarize,
+                  content: hasExistingMemory
+                    ? Locale.Store.Prompt.SummarizeWithMemory
+                    : Locale.Store.Prompt.Summarize,
                   date: "",
                 }),
               ),
@@ -1286,8 +1293,7 @@ export const useChatStore = createPersistStore(
                 get().updateTargetSession(session, (session) => {
                   // Advance only to the end of summarized range, not messages.length,
                   // so messages after the summarized range are still sent as short-term history.
-                  session.lastSummarizeIndex =
-                    summarizeIndex + toBeSummarizedMsgs.length;
+                  session.lastSummarizeIndex = summarizeIndex + realMsgCount;
                   session.memoryPrompt = message;
                   session.memoryHistory = [
                     ...(session.memoryHistory ?? []),
@@ -1427,7 +1433,7 @@ export const useChatStore = createPersistStore(
             .map((r: any) => {
               const local = localSessionMap.get(r.id);
               const localMessages =
-                local?.messagesLoaded && local.messages.length > 0
+                local?.messages && local.messages.length > 0
                   ? local.messages
                   : [];
               const session = {
@@ -1540,7 +1546,7 @@ export const useChatStore = createPersistStore(
             const current = state.sessions[idx];
             // Keep local if it has unsync'd messages (local last msg id not in cloud)
             const localLastId =
-              current.messagesLoaded && current.messages.length > 0
+              current.messages.length > 0
                 ? current.messages[current.messages.length - 1]?.id ?? ""
                 : "";
             const cloudIds = new Set(nextMessages.map((m) => m.id));

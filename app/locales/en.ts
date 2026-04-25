@@ -653,6 +653,8 @@ const en: LocaleType = {
         "Please generate a four to five word title summarizing our conversation without any lead-in, punctuation, quotation marks, periods, symbols, bold text, or additional text. Remove enclosing quotation marks.",
       Summarize:
         "Compress the conversation into reusable long-term memory context. Keep only information that matters for future turns: goals, key constraints, confirmed decisions, user preferences, current progress, open questions, and next steps. Do not include small talk or irrelevant details, and do not invent facts; mark uncertain items as 'Unconfirmed'. Exclude sensitive data (API keys, passwords, tokens, cookies, ID numbers, bank/card numbers); if present, replace with '[Sensitive data omitted]'. Output concise structured bullet points with complete critical context.",
+      SummarizeWithMemory:
+        "The conversation starts with a previous memory summary, followed by new messages. Merge both into a single updated long-term memory: preserve all still-valid information from the old summary and incorporate valuable new content (goals, constraints, decisions, preferences, progress, open questions, next steps). Omit small talk and irrelevant details. Mark uncertain items as 'Unconfirmed'. Exclude sensitive data; replace with '[Sensitive data omitted]'. Output concise structured bullet points.",
     },
   },
   Copy: {
