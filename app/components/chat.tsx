@@ -33,6 +33,7 @@ import CloseIcon from "../icons/close.svg";
 import CancelIcon from "../icons/cancel.svg";
 import ImageIcon from "../icons/image.svg";
 
+import DownloadIcon from "../icons/download.svg";
 import BottomIcon from "../icons/bottom.svg";
 import StopIcon from "../icons/pause.svg";
 import RobotIcon from "../icons/robot.svg";
@@ -109,7 +110,7 @@ import { ContextPrompts, MaskAvatar, MaskConfig } from "./mask";
 import { useMaskStore } from "../store/mask";
 import { ChatCommandPrefix, useChatCommand, useCommand } from "../command";
 import { prettyObject } from "../utils/format";
-import { ExportMessageModal } from "./exporter";
+import { ExportMessageModal, ImportMessageModal } from "./exporter";
 import { getClientConfig } from "../config/client";
 import { useAllModels } from "../utils/hooks";
 import { useProviderStore } from "../store/provider";
@@ -1036,6 +1037,7 @@ function _Chat() {
   const fontFamily = config.fontFamily;
 
   const [showExport, setShowExport] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [isTitleLoading, setIsTitleLoading] = useState(false);
 
@@ -1771,6 +1773,14 @@ function _Chat() {
                 }}
               />
             </div>
+            <div className="window-action-button">
+              <IconButton
+                icon={<DownloadIcon />}
+                bordered
+                title="导入聊天记录"
+                onClick={() => setShowImport(true)}
+              />
+            </div>
             {showMaxIcon && (
               <div className="window-action-button">
                 <IconButton
@@ -2332,8 +2342,6 @@ function _Chat() {
                     children: (
                       <div
                         style={{
-                          maxHeight: "60vh",
-                          overflowY: "auto",
                           padding: "0 16px",
                         }}
                       >
@@ -2473,6 +2481,9 @@ function _Chat() {
       </div>
       {showExport && (
         <ExportMessageModal onClose={() => setShowExport(false)} />
+      )}
+      {showImport && (
+        <ImportMessageModal onClose={() => setShowImport(false)} />
       )}
 
       {isEditingMessage && (

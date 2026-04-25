@@ -302,40 +302,6 @@ export function MessageExporter() {
       >
         <List>
           <ListItem
-            title="导入聊天 JSON"
-            subTitle="支持消息数组或 {topic, messages}"
-          >
-            <IconButton
-              text="导入本地"
-              bordered
-              shadow
-              icon={<DownloadIcon />}
-              disabled={taskState.active}
-              onClick={() => {
-                setImportTarget("local");
-                onImportJsonClick();
-              }}
-            />
-            <IconButton
-              text="导入云端"
-              bordered
-              shadow
-              icon={<DownloadIcon />}
-              disabled={taskState.active}
-              onClick={() => {
-                setImportTarget("cloud");
-                onImportJsonClick();
-              }}
-            />
-            <input
-              ref={importInputRef}
-              type="file"
-              accept="application/json,.json"
-              style={{ display: "none" }}
-              onChange={onImportJsonFile}
-            />
-          </ListItem>
-          <ListItem
             title={Locale.Export.Format.Title}
             subTitle={Locale.Export.Format.SubTitle}
           >
@@ -782,5 +748,94 @@ export function JsonPreviewer(props: {
         <Markdown content={mdText} />
       </div>
     </>
+  );
+}
+
+export function ImportMessageModal(props: { onClose: () => void }) {
+  const chatStore = useChatStore();
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [taskState, setTaskState] = useState({
+    active: false,
+    label: "",
+    percent: 0,
+  });
+
+  const onImportJsonFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.currentTarget.files?.[0];
+    if (!file) return;
+    try {
+      setTaskState({ active: true, label: "正在读取文件...", percent: 30 });
+      const parsed = JSON.parse(await file.text());
+      setTaskState({ active: true, label: "正在导入...", percent: 70 });
+      await chatStore.importSessionFromJson(
+        parsed,
+        file.name.replace(/\.json$/i, ""),
+        "cloud",
+      );
+      setTaskState({ active: true, label: "导入完成", percent: 100 });
+      setTimeout(props.onClose, 500);
+    } catch {
+      showToast("导入失败：JSON 文件格式错误");
+    } finally {
+      setTimeout(
+        () => setTaskState({ active: false, label: "", percent: 0 }),
+        600,
+      );
+      e.currentTarget.value = "";
+    }
+  };
+
+  return (
+    <div className="modal-mask">
+      <Modal title="导入聊天记录" onClose={props.onClose}>
+        <div style={{ padding: "12px 0" }}>
+          {taskState.active && (
+            <div style={{ marginBottom: 12, fontSize: 12, opacity: 0.85 }}>
+              <div>{taskState.label}</div>
+              <div
+                style={{
+                  marginTop: 6,
+                  height: 6,
+                  borderRadius: 99,
+                  background: "var(--border-in-light)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${taskState.percent}%`,
+                    height: "100%",
+                    background: "var(--primary)",
+                    transition: "width 0.2s ease",
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          <List>
+            <ListItem
+              title="导入 JSON 文件"
+              subTitle="支持消息数组或 {topic, messages}"
+            >
+              <IconButton
+                text="选择文件"
+                bordered
+                shadow
+                icon={<DownloadIcon />}
+                disabled={taskState.active}
+                onClick={() => importInputRef.current?.click()}
+              />
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json,.json"
+                style={{ display: "none" }}
+                onChange={onImportJsonFile}
+              />
+            </ListItem>
+          </List>
+        </div>
+      </Modal>
+    </div>
   );
 }
