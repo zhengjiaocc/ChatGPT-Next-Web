@@ -306,9 +306,16 @@ function sanitizeSession(session: ChatSession): ChatSession {
     return true;
   });
 
+  // For cloud sessions with lazy-loaded messages, messages may be empty
+  // temporarily even though messageCount/lastSummarizeIndex are valid.
+  // Avoid collapsing lastSummarizeIndex to 0 in that transient state.
+  const summarizeUpperBound =
+    fixed.messagesLoaded === false
+      ? Math.max(fixed.messageCount ?? 0, fixed.lastSummarizeIndex ?? 0)
+      : fixed.messages.length;
   fixed.lastSummarizeIndex = Math.max(
     0,
-    Math.min(fixed.lastSummarizeIndex ?? 0, fixed.messages.length),
+    Math.min(fixed.lastSummarizeIndex ?? 0, summarizeUpperBound),
   );
 
   if (typeof fixed.clearContextIndex === "number") {
@@ -1243,6 +1250,7 @@ export const useChatStore = createPersistStore(
           session.lastSummarizeIndex,
           session.clearContextIndex ?? 0,
         );
+        let effectiveSummarizeIndex = summarizeIndex;
         let toBeSummarizedMsgs = messages
           .filter((msg) => !msg.isError)
           .slice(summarizeIndex);
@@ -1251,7 +1259,9 @@ export const useChatStore = createPersistStore(
 
         if (historyMsgLength > (modelConfig?.max_tokens || 4000)) {
           const n = toBeSummarizedMsgs.length;
-          toBeSummarizedMsgs = toBeSummarizedMsgs.slice(Math.max(0, n - 20));
+          const slicedStartOffset = Math.max(0, n - 20);
+          toBeSummarizedMsgs = toBeSummarizedMsgs.slice(slicedStartOffset);
+          effectiveSummarizeIndex = summarizeIndex + slicedStartOffset;
         }
         const memoryPrompt = get().getMemoryPrompt();
         const hasExistingMemory = !!memoryPrompt;
@@ -1314,14 +1324,15 @@ export const useChatStore = createPersistStore(
                 get().updateTargetSession(session, (session) => {
                   // Advance only to the end of summarized range, not messages.length,
                   // so messages after the summarized range are still sent as short-term history.
-                  session.lastSummarizeIndex = summarizeIndex + realMsgCount;
+                  session.lastSummarizeIndex =
+                    effectiveSummarizeIndex + realMsgCount;
                   session.memoryPrompt = message;
                   session.memoryHistory = [
                     ...(session.memoryHistory ?? []),
                     {
                       summary: message,
-                      fromIndex: summarizeIndex,
-                      toIndex: summarizeIndex + realMsgCount,
+                      fromIndex: effectiveSummarizeIndex,
+                      toIndex: effectiveSummarizeIndex + realMsgCount,
                       isUpdate: hasExistingMemory,
                       createdAt: Date.now(),
                     },
