@@ -89,6 +89,10 @@ export type ChatMessage = RequestMessage & {
     contextPromptsCount: number;
     hasLongTermMemory: boolean;
     memoryPrompt?: string;
+    historyMessages?: Array<{
+      role: string;
+      content: string;
+    }>;
   };
 };
 
@@ -124,11 +128,6 @@ export interface ChatSession {
   mask: Mask;
   messagesLoaded?: boolean;
   messageCount?: number;
-  /**
-   * Whether this session is stale compared to remote (updated elsewhere).
-   * Used to gate sending so model context stays consistent.
-   */
-  isStale?: boolean;
 }
 
 export const DEFAULT_TOPIC = Locale.Store.DefaultTopic;
@@ -276,12 +275,6 @@ function isMeaningfulSession(session?: ChatSession) {
   return session.messages.length > 0 || session.topic !== DEFAULT_TOPIC;
 }
 
-function getSessionMessageCount(session: ChatSession) {
-  return session.messagesLoaded === false
-    ? session.messageCount ?? 0
-    : session.messages.length;
-}
-
 function getPersistableMessages(session: ChatSession) {
   return (session.messages ?? []).filter(
     (m) =>
@@ -292,44 +285,9 @@ function getPersistableMessages(session: ChatSession) {
   );
 }
 
-function getPersistableMessageCount(session: ChatSession) {
-  if (session.messagesLoaded === false) return session.messageCount ?? 0;
-  return getPersistableMessages(session).length;
-}
-
-function getPersistableLastMessageId(session: ChatSession) {
-  if (session.messagesLoaded === false) return "";
-  return getPersistableMessages(session).at(-1)?.id ?? "";
-}
-
-function debugLog(...args: any[]) {
-  if (typeof process !== "undefined" && process.env.NODE_ENV === "production")
-    return;
-  // eslint-disable-next-line no-console
-  console.log(...args);
-}
-
-function shouldPreferLocalSession(local: ChatSession, cloud: ChatSession) {
-  const localTs = local.lastUpdate || 0;
-  const cloudTs = cloud.lastUpdate || 0;
-  // Timestamp wins first (allow tiny clock drifts).
-  if (localTs > cloudTs + 1000) return true;
-  if (cloudTs > localTs + 1000) return false;
-
-  // If timestamps are close, prefer the one that has more visible messages.
-  const localCount = getSessionMessageCount(local);
-  const cloudCount = getSessionMessageCount(cloud);
-  if (localCount !== cloudCount) return localCount > cloudCount;
-
-  // Final fallback: prefer loaded local messages to avoid losing recent unsynced turns.
-  if (local.messagesLoaded !== false && cloud.messagesLoaded === false)
-    return true;
-  return false;
-}
-
 function sanitizeSession(session: ChatSession): ChatSession {
   const fixed = { ...session };
-  fixed.isStale = false;
+
   const seenMessageIds = new Set<string>();
   fixed.messages = (session.messages ?? []).filter((m) => {
     const id = m?.id;
@@ -381,7 +339,7 @@ function sanitizeSessions(sessions: ChatSession[]): ChatSession[] {
     }
     byId.set(
       session.id,
-      shouldPreferLocalSession(session, existed) ? session : existed,
+      (session.lastUpdate || 0) > (existed.lastUpdate || 0) ? session : existed,
     );
   }
 
@@ -490,30 +448,41 @@ async function syncSessionMessagesToDB(
   messages: ChatMessage[],
 ) {
   if (!isLoggedIn()) return;
-  const appendMessages = messages.filter(
+  const persistable = messages.filter(
     (m) =>
       !!m?.id &&
       !m.streaming &&
       !m.isError &&
       getMessageTextContent(m).trim().length > 0,
   );
-  if (appendMessages.length === 0) return;
-  try {
-    await fetchWithTimeout(`/api/sessions/${session.id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: session.topic,
-        messages: appendMessages,
-        model: session.mask.modelConfig.model,
-        mask: session.mask,
-        memoryPrompt: session.memoryPrompt,
-        memoryHistory: session.memoryHistory ?? [],
-        lastSummarizeIndex: session.lastSummarizeIndex,
-      }),
-    });
-  } catch (e) {
-    console.error("[Sync] failed to append session messages", e);
+  if (persistable.length === 0) return;
+  const body = JSON.stringify({
+    title: session.topic,
+    messages: persistable,
+    model: session.mask.modelConfig.model,
+    mask: session.mask,
+    memoryPrompt: session.memoryPrompt,
+    memoryHistory: session.memoryHistory ?? [],
+    lastSummarizeIndex: session.lastSummarizeIndex,
+  });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetchWithTimeout(`/api/sessions/${session.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      console.log(
+        "[Sync] POST messages",
+        session.id,
+        persistable.length,
+        res.status,
+      );
+      if (res.ok) return;
+    } catch (e) {
+      if (attempt === 2) console.error("[Sync] failed after 3 attempts", e);
+      else await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+    }
   }
 }
 
@@ -535,6 +504,7 @@ const DEFAULT_CHAT_STATE = {
   sessions: [createEmptySession()],
   currentSessionIndex: 0,
   lastInput: "",
+  hiddenSessionIds: [] as string[],
   dbLoaded: false,
   dbLoadState: "idle" as "idle" | "loading" | "ready" | "error",
 };
@@ -664,6 +634,97 @@ export const useChatStore = createPersistStore(
         }));
       },
 
+      async importSessionFromJson(
+        data: unknown,
+        fallbackTopic?: string,
+        target: "local" | "cloud" = "local",
+      ) {
+        const normalizeMessage = (m: any): ChatMessage | null => {
+          if (!m || typeof m !== "object") return null;
+          const role =
+            m.role === "user" || m.role === "assistant" || m.role === "system"
+              ? m.role
+              : "user";
+          const content =
+            typeof m.content === "string" || Array.isArray(m.content)
+              ? m.content
+              : "";
+          const textContent = getMessageTextContent({
+            role,
+            content,
+          } as ChatMessage).trim();
+          if (!textContent && !Array.isArray(content)) return null;
+          return createMessage({
+            ...m,
+            id: typeof m.id === "string" && m.id.length > 0 ? m.id : nanoid(),
+            role,
+            content,
+            date:
+              typeof m.date === "string" && m.date.length > 0
+                ? m.date
+                : new Date().toLocaleString(),
+            streaming: false,
+            isError: false,
+          });
+        };
+
+        const source = data as any;
+        const sourceMessages = Array.isArray(source)
+          ? source
+          : Array.isArray(source?.messages)
+          ? source.messages
+          : null;
+
+        if (!sourceMessages || sourceMessages.length === 0) {
+          showToast("导入失败：JSON 中未找到有效消息");
+          return false;
+        }
+
+        const importedMessages = sourceMessages
+          .map((m: any) => normalizeMessage(m))
+          .filter(Boolean) as ChatMessage[];
+
+        if (importedMessages.length === 0) {
+          showToast("导入失败：消息格式不正确");
+          return false;
+        }
+
+        const imported = createEmptySession();
+        imported.topic =
+          (typeof source?.topic === "string" && source.topic.trim()) ||
+          fallbackTopic ||
+          `导入会话 ${new Date().toLocaleString()}`;
+        imported.messages = importedMessages;
+        imported.messagesLoaded = true;
+        imported.messageCount = importedMessages.length;
+        imported.lastSummarizeIndex = 0;
+        imported.memoryPrompt = "";
+        imported.memoryHistory = [];
+        const lastTs = new Date(importedMessages.at(-1)?.date ?? 0).getTime();
+        imported.lastUpdate =
+          Number.isFinite(lastTs) && lastTs > 0 ? lastTs : Date.now();
+
+        const sanitized = sanitizeSession(imported);
+        if (target === "cloud") {
+          if (!isLoggedIn()) {
+            showToast("导入云端失败：请先登录账号");
+            return false;
+          }
+          await syncSessionMessagesToDB(sanitized, sanitized.messages);
+          await syncSessionToDB(sanitized);
+          await get().loadFromDB();
+          showToast(`导入云端成功：${sanitized.messages.length} 条消息`);
+          return true;
+        }
+
+        set((state) => ({
+          sessions: [sanitized, ...state.sessions],
+          currentSessionIndex: 0,
+        }));
+        showToast(`导入本地成功：${sanitized.messages.length} 条消息`);
+        return true;
+      },
+
       nextSession(delta: number) {
         const n = get().sessions.length;
         const limit = (x: number) => (x + n) % n;
@@ -753,130 +814,6 @@ export const useChatStore = createPersistStore(
           return;
         }
 
-        const refreshCurrentSession = async () => {
-          debugLog("[StaleGate] refresh clicked", {
-            sessionId: session.id,
-            localTs: session.lastUpdate || 0,
-            localPersistableCount: getPersistableMessageCount(session),
-            localPersistableLastId: getPersistableLastMessageId(session),
-            messagesLoaded: session.messagesLoaded !== false,
-          });
-          try {
-            // Force-reload current session messages and clear stale flag.
-            await get().loadSessionMessages(session.id, true);
-            get().updateTargetSession(
-              session,
-              (s) => {
-                s.isStale = false;
-              },
-              true,
-            );
-            const latest =
-              get().sessions.find((s) => s.id === session.id) ?? session;
-            debugLog("[StaleGate] refresh done", {
-              sessionId: latest.id,
-              localTs: latest.lastUpdate || 0,
-              localPersistableCount: getPersistableMessageCount(latest),
-              localPersistableLastId: getPersistableLastMessageId(latest),
-              messagesLoaded: latest.messagesLoaded !== false,
-              isStale: latest.isStale ?? false,
-            });
-          } catch {
-            location.reload();
-          }
-        };
-
-        // If the session is already known stale, block sending and ask user to refresh.
-        if (session.isStale) {
-          debugLog("[StaleGate] blocked: already stale", {
-            sessionId: session.id,
-            localTs: session.lastUpdate || 0,
-            localPersistableCount: getPersistableMessageCount(session),
-            localPersistableLastId: getPersistableLastMessageId(session),
-          });
-          showToast("该会话已在其他设备更新，请先刷新后再发送。", {
-            text: "刷新",
-            onClick: () => void refreshCurrentSession(),
-          });
-          return;
-        }
-
-        // Before sending: check if remote has newer updates (1 extra request).
-        if (isLoggedIn() && session.id) {
-          try {
-            const res = await fetchWithTimeout(
-              `/api/sessions/${encodeURIComponent(session.id)}?meta=1`,
-              undefined,
-              6000,
-            );
-            if (res.status === 401) {
-              useUserStore.getState().logout();
-              showToast("登录状态已失效，请重新登录");
-              return;
-            }
-            if (res.ok) {
-              const meta = (await res.json()) as any;
-              const remoteTs = new Date(meta?.updated_at ?? 0).getTime();
-              const remoteCount = Number(meta?.message_count ?? 0);
-              const remoteLastId = String(meta?.last_message_id ?? "");
-              const localCount = getPersistableMessageCount(session);
-              const localLastId = getPersistableLastMessageId(session);
-
-              // Stale detection primarily by message id.
-              // Fallback to count only when remote id is unavailable.
-              const hasRemoteLastId = remoteLastId.length > 0;
-              const lastIdMismatch =
-                hasRemoteLastId &&
-                !!localLastId &&
-                remoteLastId !== localLastId;
-              const countAhead =
-                Number.isFinite(remoteCount) && remoteCount > localCount;
-              const remoteNewer = hasRemoteLastId ? lastIdMismatch : countAhead;
-
-              debugLog("[StaleGate] meta check", {
-                sessionId: session.id,
-                remoteTs,
-                remoteCount,
-                remoteLastId,
-                localCount,
-                localLastId,
-                hasRemoteLastId,
-                lastIdMismatch,
-                remoteNewer,
-                // messagesLoaded is guaranteed here (checked at function start)
-                messagesLoaded: true,
-                localTailIds: getPersistableMessages(session)
-                  .slice(-5)
-                  .map((m) => m.id),
-              });
-              if (remoteNewer) {
-                get().updateTargetSession(
-                  session,
-                  (s) => {
-                    s.isStale = true;
-                    // Keep a hint so list rendering can reflect remote count.
-                    if (s.messagesLoaded === false)
-                      s.messageCount = Math.max(
-                        s.messageCount ?? 0,
-                        remoteCount,
-                      );
-                    if (Number.isFinite(remoteTs) && remoteTs > 0)
-                      s.lastUpdate = Math.max(s.lastUpdate || 0, remoteTs);
-                  },
-                  true,
-                );
-                debugLog("[StaleGate] marked stale", { sessionId: session.id });
-                showToast("该会话已在其他设备更新，请先刷新后再发送。", {
-                  text: "刷新",
-                  onClick: () => void refreshCurrentSession(),
-                });
-                return;
-              }
-            }
-          } catch {
-            // best-effort; ignore
-          }
-        }
         const modelConfig = session.mask.modelConfig;
 
         if (!modelConfig.model || !modelConfig.providerName) {
@@ -916,10 +853,11 @@ export const useChatStore = createPersistStore(
         // get recent messages before writing to session to avoid sending userMessage twice
         const ctx = await get().getMessagesWithMemoryContext();
         userMessage.contextInfo = {
-          sentCount: ctx.sentHistoryCount,
+          sentCount: (ctx.sentHistoryMessages ?? []).length,
           contextPromptsCount: ctx.contextPromptsCount,
           hasLongTermMemory: ctx.hasLongTermMemory,
           memoryPrompt: ctx.memoryPrompt,
+          historyMessages: ctx.sentHistoryMessages ?? [],
         };
         const sendMessages = ctx.messages.concat(userMessage);
         const messageIndex = session.messages.length + 2;
@@ -991,11 +929,8 @@ export const useChatStore = createPersistStore(
             ChatControllerPool.remove(session.id, botMessage.id);
             const latestSession =
               get().sessions.find((s) => s.id === session.id) ?? session;
-            // append-only sync for the newly completed round
-            void syncSessionMessagesToDB(latestSession, [
-              userMessage,
-              botMessage,
-            ]);
+            // full sync so resend/truncate is reflected on server
+            void syncSessionMessagesToDB(latestSession, latestSession.messages);
             // sync ASAP so other devices can see new messages quickly
             void flushSessionSyncQueue(session.id);
           },
@@ -1131,16 +1066,32 @@ export const useChatStore = createPersistStore(
           reversedRecentMessages.push(msg);
         }
 
+        // drop trailing assistant messages before reversing so history starts with user
+        while (
+          reversedRecentMessages.length > 0 &&
+          reversedRecentMessages[reversedRecentMessages.length - 1].role ===
+            "assistant"
+        ) {
+          reversedRecentMessages.pop();
+        }
+
         const recentMessages = [
           ...systemPrompts,
           ...longTermMemoryPrompts,
           ...contextPrompts,
           ...reversedRecentMessages.reverse(),
         ];
+        const sentHistoryMessages = reversedRecentMessages
+          .map((m) => ({
+            role: m.role,
+            content: getMessageTextContent(m),
+          }))
+          .filter((m) => m.content.trim().length > 0);
 
         return {
           messages: recentMessages,
-          sentHistoryCount: reversedRecentMessages.length,
+          sentHistoryCount: sentHistoryMessages.length,
+          sentHistoryMessages,
           contextPromptsCount: contextPrompts.length,
           hasLongTermMemory: shouldSendLongTermMemory,
           memoryPrompt: shouldSendLongTermMemory ? session.memoryPrompt : "",
@@ -1467,104 +1418,87 @@ export const useChatStore = createPersistStore(
             }
             return;
           }
+          const hidden = new Set<string>(get().hiddenSessionIds ?? []);
           const providers = useProviderStore.getState().providers;
-          const cloudSessions: ChatSession[] = filteredRows.map((r: any) => {
-            const session = {
-              ...createEmptySession(),
-              id: r.id,
-              topic: r.title,
-              messages: [],
-              messagesLoaded: false as const,
-              messageCount: r.message_count ?? 0,
-              isStale: false,
-              mask: r.mask ?? createEmptyMask(),
-              memoryPrompt: r.memory_prompt ?? "",
-              memoryHistory: r.memory_history ?? [],
-              lastSummarizeIndex: r.last_summarize_index ?? 0,
-              lastUpdate: new Date(r.updated_at).getTime(),
-            };
-            // Auto-fill providerId if missing
-            if (!session.mask.modelConfig.providerId) {
-              const { model, providerName } = session.mask.modelConfig;
-              const provider =
-                providers.find(
-                  (p) =>
-                    p.enabled &&
-                    p.type.toLowerCase() ===
-                      (providerName ?? "").toLowerCase() &&
-                    p.models.includes(model),
-                ) ??
-                providers.find(
-                  (p) =>
-                    p.enabled &&
-                    p.type.toLowerCase() === (providerName ?? "").toLowerCase(),
-                ) ??
-                providers.find((p) => p.enabled);
-              if (provider) {
-                session.mask.modelConfig.providerId = provider.id;
-                if (provider.type !== providerName)
-                  session.mask.modelConfig.providerName = provider.type as any;
+          const cloudSessions: ChatSession[] = filteredRows
+            .filter((r: any) => !hidden.has(r.id))
+            .map((r: any) => {
+              const session = {
+                ...createEmptySession(),
+                id: r.id,
+                topic: r.title,
+                messages: [],
+                messagesLoaded: false as const,
+                messageCount: r.message_count ?? 0,
+                mask: r.mask ?? createEmptyMask(),
+                memoryPrompt: r.memory_prompt ?? "",
+                memoryHistory: r.memory_history ?? [],
+                lastSummarizeIndex: r.last_summarize_index ?? 0,
+                lastUpdate: new Date(r.updated_at).getTime(),
+              };
+              // Auto-fill providerId if missing
+              if (!session.mask.modelConfig.providerId) {
+                const { model, providerName } = session.mask.modelConfig;
+                const provider =
+                  providers.find(
+                    (p) =>
+                      p.enabled &&
+                      p.type.toLowerCase() ===
+                        (providerName ?? "").toLowerCase() &&
+                      p.models.includes(model),
+                  ) ??
+                  providers.find(
+                    (p) =>
+                      p.enabled &&
+                      p.type.toLowerCase() ===
+                        (providerName ?? "").toLowerCase(),
+                  ) ??
+                  providers.find((p) => p.enabled);
+                if (provider) {
+                  session.mask.modelConfig.providerId = provider.id;
+                  if (provider.type !== providerName)
+                    session.mask.modelConfig.providerName =
+                      provider.type as any;
+                }
               }
-            }
-            return session;
-          });
+              return session;
+            });
 
-          // Merge cloud sessions with hydrated local sessions.
-          // This prevents cloud stale snapshots from overriding recent local turns.
-          const mergedById = new Map<
-            string,
-            { session: ChatSession; localPreferred: boolean }
-          >();
-          for (const s of cloudSessions) {
-            mergedById.set(s.id, { session: s, localPreferred: false });
-          }
-
-          for (const local of localSessions) {
-            const existed = mergedById.get(local.id);
-            if (!existed) {
-              mergedById.set(local.id, {
-                session: local,
-                localPreferred: true,
-              });
-              continue;
-            }
-            if (shouldPreferLocalSession(local, existed.session)) {
-              mergedById.set(local.id, {
-                session: local,
-                localPreferred: true,
-              });
-            }
-          }
-
-          const sessions = sanitizeSessions(
-            Array.from(mergedById.values())
-              .map((v) => v.session)
-              .sort((a, b) => (b.lastUpdate || 0) - (a.lastUpdate || 0)),
+          // Cloud is authoritative. Only upload local-only sessions (not in cloud).
+          const cloudIds = new Set(cloudSessions.map((s) => s.id));
+          const localOnlySessions = localSessions.filter(
+            (s) => !cloudIds.has(s.id) && isMeaningfulSession(s),
           );
+
+          const allSessions = sanitizeSessions([
+            ...cloudSessions,
+            ...localOnlySessions,
+          ]);
 
           const prevCurrentId = get().currentSession()?.id;
           const mergedCurrentIndex = prevCurrentId
-            ? sessions.findIndex((s) => s.id === prevCurrentId)
+            ? allSessions.findIndex((s) => s.id === prevCurrentId)
             : -1;
           set({
-            sessions,
+            sessions: allSessions,
             currentSessionIndex:
               mergedCurrentIndex >= 0 ? mergedCurrentIndex : 0,
             dbLoaded: true,
             dbLoadState: "ready",
           });
 
-          // Push local-preferred merged sessions back to cloud ASAP.
-          mergedById.forEach(({ session, localPreferred }) => {
-            if (localPreferred && isMeaningfulSession(session)) {
-              void syncSessionMessagesToDB(session, session.messages);
-              void syncSessionToDB(session);
-            }
+          // Upload local-only sessions to cloud.
+          localOnlySessions.forEach((session) => {
+            void syncSessionMessagesToDB(session, session.messages);
+            void syncSessionToDB(session);
           });
 
           // 预取第一个 session 的消息，避免等待 React 渲染周期
-          if (sessions.length > 0) {
-            void get().loadSessionMessages(sessions[0].id);
+          if (
+            allSessions.length > 0 &&
+            allSessions[0].messagesLoaded === false
+          ) {
+            void get().loadSessionMessages(allSessions[0].id);
           }
         } catch (e) {
           console.error("[Chat] failed to load sessions from db", e);
@@ -1582,7 +1516,6 @@ export const useChatStore = createPersistStore(
         if (index < 0) return;
         if (!force && get().sessions[index].messagesLoaded) return;
         try {
-          debugLog("[Session] loadSessionMessages start", { sessionId, force });
           const res = await fetchWithTimeout(`/api/sessions/${sessionId}`);
           if (res.status === 401) {
             useUserStore.getState().logout();
@@ -1590,36 +1523,20 @@ export const useChatStore = createPersistStore(
           }
           if (!res.ok) throw new Error(`load failed: ${res.status}`);
           const row = await res.json();
+          const nextMessages = (row as any)?.messages ?? [];
           set((state) => {
             const idx = state.sessions.findIndex((s) => s.id === sessionId);
             if (idx < 0) return state;
             const updated = [...state.sessions];
-            const remoteTs = new Date((row as any)?.updated_at ?? 0).getTime();
-            const nextMessages = (row as any)?.messages ?? [];
             updated[idx] = {
               ...updated[idx],
               messages: nextMessages,
               messagesLoaded: true,
-              isStale: false,
               messageCount: Array.isArray(nextMessages)
                 ? nextMessages.length
                 : updated[idx].messageCount,
-              lastUpdate:
-                Number.isFinite(remoteTs) && remoteTs > 0
-                  ? remoteTs
-                  : updated[idx].lastUpdate,
             };
             return { sessions: updated };
-          });
-          debugLog("[Session] loadSessionMessages ok", {
-            sessionId,
-            remoteTs: new Date((row as any)?.updated_at ?? 0).getTime(),
-            remoteCount: Array.isArray((row as any)?.messages)
-              ? (row as any).messages.length
-              : undefined,
-            remoteLastId: Array.isArray((row as any)?.messages)
-              ? (row as any).messages.at(-1)?.id
-              : undefined,
           });
         } catch (e) {
           console.error("[Chat] failed to load session messages", e);
@@ -1728,6 +1645,13 @@ export const useChatStore = createPersistStore(
       }
 
       newState.sessions = sanitizeSessions(newState.sessions as ChatSession[]);
+      newState.hiddenSessionIds = Array.isArray(
+        (newState as any).hiddenSessionIds,
+      )
+        ? (newState as any).hiddenSessionIds.filter(
+            (x: any) => typeof x === "string",
+          )
+        : [];
       if (
         typeof newState.currentSessionIndex !== "number" ||
         newState.currentSessionIndex < 0 ||

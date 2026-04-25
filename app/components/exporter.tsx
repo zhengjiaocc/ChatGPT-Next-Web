@@ -23,7 +23,7 @@ import LoadingIcon from "../icons/three-dots.svg";
 import ChatGptIcon from "../icons/chatgpt.png";
 
 import DownloadIcon from "../icons/download.svg";
-import { useMemo, useRef, useState } from "react";
+import { ChangeEvent, useMemo, useRef, useState } from "react";
 import { MessageSelector, useMessageSelector } from "./message-selector";
 import { Avatar } from "./emoji";
 import dynamic from "next/dynamic";
@@ -161,6 +161,17 @@ export function MessageExporter() {
 
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importTarget, setImportTarget] = useState<"local" | "cloud">("local");
+  const [taskState, setTaskState] = useState<{
+    active: boolean;
+    label: string;
+    percent: number;
+  }>({
+    active: false,
+    label: "",
+    percent: 0,
+  });
   const { selection, updateSelection } = useMessageSelector();
   const selectedMessages = useMemo(() => {
     const ret: ChatMessage[] = [];
@@ -175,23 +186,111 @@ export function MessageExporter() {
     session.mask.context,
     selection,
   ]);
+
+  const onImportJsonClick = () => {
+    if (taskState.active) return;
+    importInputRef.current?.click();
+  };
+
+  const onImportJsonFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (taskState.active) return;
+    const inputEl = e.currentTarget;
+    const file = inputEl.files?.[0];
+    if (!file) return;
+    try {
+      setTaskState({
+        active: true,
+        label: "正在读取 JSON 文件...",
+        percent: 15,
+      });
+      const text = await file.text();
+      setTaskState({ active: true, label: "正在解析 JSON...", percent: 45 });
+      const parsed = JSON.parse(text);
+      const fallbackTopic = file.name.replace(/\.json$/i, "").trim();
+      setTaskState({
+        active: true,
+        label:
+          importTarget === "cloud"
+            ? "正在导入云端并刷新本地..."
+            : "正在导入本地会话...",
+        percent: 75,
+      });
+      const ok = await chatStore.importSessionFromJson(
+        parsed,
+        fallbackTopic,
+        importTarget,
+      );
+      if (ok) {
+        setTaskState({ active: true, label: "导入完成", percent: 100 });
+      }
+    } catch (err) {
+      showToast("导入失败：JSON 文件格式错误");
+    } finally {
+      setTimeout(() => {
+        setTaskState({ active: false, label: "", percent: 0 });
+      }, 500);
+      inputEl.value = "";
+    }
+  };
+
   function preview() {
     if (exportConfig.format === "text") {
       return (
-        <MarkdownPreviewer messages={selectedMessages} topic={session.topic} />
+        <MarkdownPreviewer
+          messages={selectedMessages}
+          topic={session.topic}
+          onTaskStateChange={setTaskState}
+        />
       );
     } else if (exportConfig.format === "json") {
       return (
-        <JsonPreviewer messages={selectedMessages} topic={session.topic} />
+        <JsonPreviewer
+          messages={selectedMessages}
+          topic={session.topic}
+          onTaskStateChange={setTaskState}
+        />
       );
     } else {
       return (
-        <ImagePreviewer messages={selectedMessages} topic={session.topic} />
+        <ImagePreviewer
+          messages={selectedMessages}
+          topic={session.topic}
+          onTaskStateChange={setTaskState}
+        />
       );
     }
   }
   return (
     <>
+      {taskState.active && (
+        <div
+          style={{
+            marginBottom: 10,
+            fontSize: 12,
+            opacity: 0.85,
+          }}
+        >
+          <div>{taskState.label}</div>
+          <div
+            style={{
+              marginTop: 6,
+              height: 6,
+              borderRadius: 99,
+              background: "var(--border-in-light)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${taskState.percent}%`,
+                height: "100%",
+                background: "var(--primary)",
+                transition: "width 0.2s ease",
+              }}
+            />
+          </div>
+        </div>
+      )}
       <Steps
         steps={steps}
         index={currentStepIndex}
@@ -202,6 +301,40 @@ export function MessageExporter() {
         style={currentStep.value !== "select" ? { display: "none" } : {}}
       >
         <List>
+          <ListItem
+            title="导入聊天 JSON"
+            subTitle="支持消息数组或 {topic, messages}"
+          >
+            <IconButton
+              text="导入本地"
+              bordered
+              shadow
+              icon={<DownloadIcon />}
+              disabled={taskState.active}
+              onClick={() => {
+                setImportTarget("local");
+                onImportJsonClick();
+              }}
+            />
+            <IconButton
+              text="导入云端"
+              bordered
+              shadow
+              icon={<DownloadIcon />}
+              disabled={taskState.active}
+              onClick={() => {
+                setImportTarget("cloud");
+                onImportJsonClick();
+              }}
+            />
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              style={{ display: "none" }}
+              onChange={onImportJsonFile}
+            />
+          </ListItem>
           <ListItem
             title={Locale.Export.Format.Title}
             subTitle={Locale.Export.Format.SubTitle}
@@ -254,6 +387,7 @@ export function PreviewActions(props: {
   download: () => void;
   copy: () => void;
   showCopy?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <>
@@ -264,6 +398,7 @@ export function PreviewActions(props: {
             bordered
             shadow
             icon={<CopyIcon />}
+            disabled={props.disabled}
             onClick={props.copy}
           ></IconButton>
         )}
@@ -272,6 +407,7 @@ export function PreviewActions(props: {
           bordered
           shadow
           icon={<DownloadIcon />}
+          disabled={props.disabled}
           onClick={props.download}
         ></IconButton>
       </div>
@@ -282,6 +418,11 @@ export function PreviewActions(props: {
 export function ImagePreviewer(props: {
   messages: ChatMessage[];
   topic: string;
+  onTaskStateChange?: (state: {
+    active: boolean;
+    label: string;
+    percent: number;
+  }) => void;
 }) {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
@@ -289,43 +430,75 @@ export function ImagePreviewer(props: {
   const config = useAppConfig();
 
   const previewRef = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
 
-  const copy = () => {
+  const copy = async () => {
+    if (busy) return;
+    setBusy(true);
+    props.onTaskStateChange?.({
+      active: true,
+      label: "正在生成图片并复制...",
+      percent: 30,
+    });
     showToast(Locale.Export.Image.Toast);
     const dom = previewRef.current;
-    if (!dom) return;
-    toBlob(dom).then((blob) => {
-      if (!blob) return;
-      try {
-        navigator.clipboard
-          .write([
-            new ClipboardItem({
-              "image/png": blob,
-            }),
-          ])
-          .then(() => {
-            showToast(Locale.Copy.Success);
-            refreshPreview();
-          });
-      } catch (e) {
-        console.error("[Copy Image] ", e);
-        showToast(Locale.Copy.Failed);
-      }
-    });
+    if (!dom) {
+      setBusy(false);
+      props.onTaskStateChange?.({ active: false, label: "", percent: 0 });
+      return;
+    }
+    try {
+      const blob = await toBlob(dom);
+      if (!blob) throw new Error("empty blob");
+      props.onTaskStateChange?.({
+        active: true,
+        label: "正在写入剪贴板...",
+        percent: 80,
+      });
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": blob,
+        }),
+      ]);
+      showToast(Locale.Copy.Success);
+      refreshPreview();
+    } catch (e) {
+      console.error("[Copy Image] ", e);
+      showToast(Locale.Copy.Failed);
+    } finally {
+      setBusy(false);
+      props.onTaskStateChange?.({ active: false, label: "", percent: 0 });
+    }
   };
 
   const isMobile = useMobileScreen();
 
   const download = async () => {
+    if (busy) return;
+    setBusy(true);
+    props.onTaskStateChange?.({
+      active: true,
+      label: "正在生成导出图片...",
+      percent: 25,
+    });
     showToast(Locale.Export.Image.Toast);
     const dom = previewRef.current;
-    if (!dom) return;
+    if (!dom) {
+      setBusy(false);
+      props.onTaskStateChange?.({ active: false, label: "", percent: 0 });
+      return;
+    }
 
     const isApp = getClientConfig()?.isApp;
 
     try {
       const blob = await toPng(dom);
       if (!blob) return;
+      props.onTaskStateChange?.({
+        active: true,
+        label: "正在保存文件...",
+        percent: 75,
+      });
 
       if (isMobile || (isApp && window.__TAURI__)) {
         if (isApp && window.__TAURI__) {
@@ -362,8 +535,18 @@ export function ImagePreviewer(props: {
         link.click();
         refreshPreview();
       }
+      props.onTaskStateChange?.({
+        active: true,
+        label: "导出完成",
+        percent: 100,
+      });
     } catch (error) {
       showToast(Locale.Download.Failed);
+    } finally {
+      setBusy(false);
+      setTimeout(() => {
+        props.onTaskStateChange?.({ active: false, label: "", percent: 0 });
+      }, 400);
     }
   };
 
@@ -376,7 +559,12 @@ export function ImagePreviewer(props: {
 
   return (
     <div className={styles["image-previewer"]}>
-      <PreviewActions copy={copy} download={download} showCopy={!isMobile} />
+      <PreviewActions
+        copy={copy}
+        download={download}
+        showCopy={!isMobile}
+        disabled={busy}
+      />
       <div
         className={clsx(styles["preview-body"], styles["default-theme"])}
         ref={previewRef}
@@ -486,6 +674,11 @@ export function ImagePreviewer(props: {
 export function MarkdownPreviewer(props: {
   messages: ChatMessage[];
   topic: string;
+  onTaskStateChange?: (state: {
+    active: boolean;
+    label: string;
+    percent: number;
+  }) => void;
 }) {
   const mdText =
     `# ${props.topic}\n\n` +
@@ -500,10 +693,28 @@ export function MarkdownPreviewer(props: {
       .join("\n\n");
 
   const copy = () => {
+    props.onTaskStateChange?.({
+      active: true,
+      label: "正在复制 Markdown...",
+      percent: 100,
+    });
     copyToClipboard(mdText);
+    setTimeout(
+      () => props.onTaskStateChange?.({ active: false, label: "", percent: 0 }),
+      250,
+    );
   };
   const download = () => {
+    props.onTaskStateChange?.({
+      active: true,
+      label: "正在导出 Markdown...",
+      percent: 100,
+    });
     downloadAs(mdText, `${props.topic}.md`);
+    setTimeout(
+      () => props.onTaskStateChange?.({ active: false, label: "", percent: 0 }),
+      250,
+    );
   };
   return (
     <>
@@ -518,6 +729,11 @@ export function MarkdownPreviewer(props: {
 export function JsonPreviewer(props: {
   messages: ChatMessage[];
   topic: string;
+  onTaskStateChange?: (state: {
+    active: boolean;
+    label: string;
+    percent: number;
+  }) => void;
 }) {
   const msgs = {
     messages: [
@@ -535,10 +751,28 @@ export function JsonPreviewer(props: {
   const minifiedJson = JSON.stringify(msgs);
 
   const copy = () => {
+    props.onTaskStateChange?.({
+      active: true,
+      label: "正在复制 JSON...",
+      percent: 100,
+    });
     copyToClipboard(minifiedJson);
+    setTimeout(
+      () => props.onTaskStateChange?.({ active: false, label: "", percent: 0 }),
+      250,
+    );
   };
   const download = () => {
+    props.onTaskStateChange?.({
+      active: true,
+      label: "正在导出 JSON...",
+      percent: 100,
+    });
     downloadAs(JSON.stringify(msgs), `${props.topic}.json`);
+    setTimeout(
+      () => props.onTaskStateChange?.({ active: false, label: "", percent: 0 }),
+      250,
+    );
   };
 
   return (

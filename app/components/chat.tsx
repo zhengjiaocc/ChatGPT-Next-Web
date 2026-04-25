@@ -1251,7 +1251,7 @@ function _Chat() {
     }
   };
 
-  const onResend = (message: ChatMessage) => {
+  const onResend = async (message: ChatMessage) => {
     // Ensure no in-flight stream keeps updating truncated messages.
     // Otherwise a late onUpdate/onFinish may re-introduce "future" assistant content.
     ChatControllerPool.stopAll();
@@ -1288,26 +1288,10 @@ function _Chat() {
       return;
     }
 
-    // truncate the messages from the user message index
-    chatStore.updateTargetSession(session, (session) => {
-      session.messages.splice(userMessageIndex);
-      // force replace reference so subsequent reads never see stale array
-      session.messages = session.messages.slice();
-      // if memory was summarized beyond the truncation point, discard it
-      if (session.lastSummarizeIndex > userMessageIndex) {
-        session.lastSummarizeIndex = 0;
-        session.memoryPrompt = "";
-      }
-      // keep clearContextIndex within bounds after truncation
-      if (
-        typeof session.clearContextIndex === "number" &&
-        session.clearContextIndex > session.messages.length
-      ) {
-        session.clearContextIndex = session.messages.length;
-      }
+    const beforeMessages = session.messages.slice(0, userMessageIndex);
+    chatStore.updateTargetSession(session, (s) => {
+      s.messages = beforeMessages;
     });
-
-    // resend the message
     setIsLoading(true);
     const textContent = getMessageTextContent(userMessage);
     const images = getMessageImages(userMessage);
@@ -1852,12 +1836,14 @@ function _Chat() {
                     // 计算发送该消息时携带的上下文信息
                     const msgContextInfo = (() => {
                       if (!isUser || isContext) return null;
-                      // 优先使用发送时写入的真实上下文信息
-                      if (message.contextInfo) return message.contextInfo;
                       const modelConfig = session.mask.modelConfig;
                       const clearIdx = session.clearContextIndex ?? 0;
-                      // i 是在 messages（含 context）中的索引，需要换算成 session.messages 中的索引
-                      const sessionMsgIndex = i - context.length;
+                      const sessionMsgIndex = session.messages.findIndex(
+                        (m) => m.id === message.id,
+                      );
+                      if (sessionMsgIndex < 0) return null;
+
+                      // always compute from current session.messages (real-time, accurate after resend)
                       const hasLongTermMemory =
                         modelConfig.sendMemory &&
                         !!session.memoryPrompt &&
@@ -1867,15 +1853,30 @@ function _Chat() {
                         clearIdx,
                         hasLongTermMemory ? session.lastSummarizeIndex : 0,
                       );
-                      const sentCount = Math.min(
-                        Math.max(0, sessionMsgIndex - effectiveStart),
-                        modelConfig.historyMessageCount,
+                      const historyStart = Math.max(
+                        effectiveStart,
+                        sessionMsgIndex - modelConfig.historyMessageCount,
                       );
+                      const historyMessages = session.messages
+                        .slice(historyStart, sessionMsgIndex)
+                        .filter((m) => !m.isError)
+                        .map((m) => ({
+                          role: m.role,
+                          content: getMessageTextContent(m),
+                        }));
+                      const firstUser = historyMessages.findIndex(
+                        (m) => m.role === "user",
+                      );
+                      const trimmedHistory =
+                        firstUser > 0
+                          ? historyMessages.slice(firstUser)
+                          : historyMessages;
                       return {
-                        sentCount,
+                        sentCount: trimmedHistory.length,
                         hasLongTermMemory,
                         memoryPrompt: session.memoryPrompt,
                         contextPromptsCount: session.mask.context.length,
+                        historyMessages: trimmedHistory,
                       };
                     })();
 
@@ -2002,50 +2003,27 @@ function _Chat() {
                                                           marginBottom: 4,
                                                         }}
                                                       >
-                                                        携带历史消息：
-                                                        {
-                                                          msgContextInfo.sentCount
-                                                        }{" "}
-                                                        条
+                                                        本次发送内容
                                                       </summary>
-                                                      {msgContextInfo.sentCount >
-                                                      0 ? (
-                                                        session.messages
-                                                          .slice(
-                                                            Math.max(
-                                                              0,
-                                                              session.messages
-                                                                .length -
-                                                                msgContextInfo.sentCount,
-                                                            ),
-                                                          )
-                                                          .map((m, idx) => (
-                                                            <div
-                                                              key={idx}
-                                                              style={{
-                                                                margin: "4px 0",
-                                                                padding:
-                                                                  "6px 12px",
-                                                                background:
-                                                                  "var(--second)",
-                                                                borderRadius: 8,
-                                                                whiteSpace:
-                                                                  "pre-wrap",
-                                                                fontSize: 12,
-                                                              }}
-                                                            >
-                                                              <span
-                                                                style={{
-                                                                  opacity: 0.5,
-                                                                }}
-                                                              >
-                                                                [{m.role}]{" "}
-                                                              </span>
-                                                              {getMessageTextContent(
-                                                                m,
-                                                              )}
-                                                            </div>
-                                                          ))
+                                                      {getMessageTextContent(
+                                                        message,
+                                                      ) ? (
+                                                        <div
+                                                          style={{
+                                                            margin: "4px 0",
+                                                            padding: "6px 12px",
+                                                            background:
+                                                              "var(--second)",
+                                                            borderRadius: 8,
+                                                            whiteSpace:
+                                                              "pre-wrap",
+                                                            fontSize: 12,
+                                                          }}
+                                                        >
+                                                          {getMessageTextContent(
+                                                            message,
+                                                          )}
+                                                        </div>
                                                       ) : (
                                                         <div
                                                           style={{
@@ -2058,55 +2036,6 @@ function _Chat() {
                                                         </div>
                                                       )}
                                                     </details>
-                                                    {msgContextInfo.contextPromptsCount >
-                                                      0 && (
-                                                      <details
-                                                        style={{ marginTop: 8 }}
-                                                      >
-                                                        <summary
-                                                          style={{
-                                                            cursor: "pointer",
-                                                            fontWeight: "bold",
-                                                            marginBottom: 4,
-                                                          }}
-                                                        >
-                                                          预设提示词：
-                                                          {
-                                                            msgContextInfo.contextPromptsCount
-                                                          }{" "}
-                                                          条
-                                                        </summary>
-                                                        {session.mask.context.map(
-                                                          (c, idx) => (
-                                                            <div
-                                                              key={idx}
-                                                              style={{
-                                                                margin: "4px 0",
-                                                                padding:
-                                                                  "6px 12px",
-                                                                background:
-                                                                  "var(--second)",
-                                                                borderRadius: 8,
-                                                                whiteSpace:
-                                                                  "pre-wrap",
-                                                                fontSize: 12,
-                                                              }}
-                                                            >
-                                                              <span
-                                                                style={{
-                                                                  opacity: 0.5,
-                                                                }}
-                                                              >
-                                                                [{c.role}]{" "}
-                                                              </span>
-                                                              {getMessageTextContent(
-                                                                c,
-                                                              )}
-                                                            </div>
-                                                          ),
-                                                        )}
-                                                      </details>
-                                                    )}
                                                     <details
                                                       style={{ marginTop: 8 }}
                                                     >
@@ -2119,7 +2048,11 @@ function _Chat() {
                                                       >
                                                         长期记忆：
                                                         {msgContextInfo.hasLongTermMemory
-                                                          ? "已携带"
+                                                          ? `已携带（第 ${
+                                                              session
+                                                                .memoryHistory
+                                                                ?.length ?? 1
+                                                            } 次更新）`
                                                           : "无"}
                                                       </summary>
                                                       {msgContextInfo.hasLongTermMemory &&
@@ -2139,6 +2072,87 @@ function _Chat() {
                                                             msgContextInfo.memoryPrompt
                                                           }
                                                         </div>
+                                                      ) : (
+                                                        <div
+                                                          style={{
+                                                            opacity: 0.5,
+                                                            fontSize: 12,
+                                                            padding: "4px 0",
+                                                          }}
+                                                        >
+                                                          无
+                                                        </div>
+                                                      )}
+                                                    </details>
+                                                    <details
+                                                      style={{ marginTop: 8 }}
+                                                    >
+                                                      <summary
+                                                        style={{
+                                                          cursor: "pointer",
+                                                          fontWeight: "bold",
+                                                          marginBottom: 4,
+                                                        }}
+                                                      >
+                                                        携带的历史对话：
+                                                        {Math.floor(
+                                                          ((
+                                                            msgContextInfo.historyMessages ??
+                                                            []
+                                                          ).length ||
+                                                            msgContextInfo.sentCount) /
+                                                            2,
+                                                        )}{" "}
+                                                        轮
+                                                      </summary>
+                                                      {(
+                                                        msgContextInfo.historyMessages ??
+                                                        []
+                                                      ).length > 0 ? (
+                                                        [
+                                                          ...(msgContextInfo.historyMessages ??
+                                                            []),
+                                                          {
+                                                            role: message.role,
+                                                            content:
+                                                              getMessageTextContent(
+                                                                message,
+                                                              ),
+                                                            isCurrent: true,
+                                                          },
+                                                        ].map((m: any, idx) => (
+                                                          <div
+                                                            key={idx}
+                                                            style={{
+                                                              margin: "4px 0",
+                                                              padding:
+                                                                "6px 12px",
+                                                              background:
+                                                                m.isCurrent
+                                                                  ? "var(--primary)"
+                                                                  : "var(--second)",
+                                                              color: m.isCurrent
+                                                                ? "#fff"
+                                                                : undefined,
+                                                              borderRadius: 8,
+                                                              whiteSpace:
+                                                                "pre-wrap",
+                                                              fontSize: 12,
+                                                            }}
+                                                          >
+                                                            <span
+                                                              style={{
+                                                                opacity: 0.6,
+                                                              }}
+                                                            >
+                                                              [{m.role}]
+                                                              {m.isCurrent
+                                                                ? " ← 当前"
+                                                                : ""}{" "}
+                                                            </span>
+                                                            {m.content}
+                                                          </div>
+                                                        ))
                                                       ) : (
                                                         <div
                                                           style={{
@@ -2268,7 +2282,7 @@ function _Chat() {
                             <div className={styles["chat-message-action-date"]}>
                               {isContext
                                 ? Locale.Chat.IsContext
-                                : message.date.toLocaleString()}
+                                : new Date(message.date).toLocaleString()}
                             </div>
                           </div>
                         </div>
