@@ -43,8 +43,36 @@ import { showConfirm } from "./ui-lib";
 import clsx from "clsx";
 import { isMcpEnabled } from "../mcp/actions";
 
+/** dynamic 拉取 chat-list chunk 时的占位，避免短暂空白 */
+function ChatListChunkPlaceholder() {
+  return (
+    <div className={styles["chat-list"]}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className={styles["chat-item"]}>
+          <div
+            className={`${styles["chat-item-title"]} ${styles["skeleton-item"]}`}
+            style={{
+              color: "transparent",
+              borderRadius: 4,
+              width: i % 2 === 0 ? "75%" : "55%",
+            }}
+          >
+            {"\u200b"}
+          </div>
+          <div
+            className={`${styles["chat-item-info"]} ${styles["skeleton-item"]}`}
+            style={{ color: "transparent", borderRadius: 4, width: "45%" }}
+          >
+            {"\u200b"}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const ChatList = dynamic(async () => (await import("./chat-list")).ChatList, {
-  loading: () => null,
+  loading: () => <ChatListChunkPlaceholder />,
 });
 
 export function useHotKey() {
@@ -250,8 +278,8 @@ export function SideBar(props: { className?: string }) {
   const config = useAppConfig();
   const chatStore = useChatStore();
   const providerStore = useProviderStore();
-  const hasEnabledProvider =
-    chatStore.dbLoaded && providerStore.providers.some((p) => p.enabled);
+  // ChatList 在 db 未就绪时会显示骨架；不要等 dbLoaded 再挂载，否则加载阶段侧边栏整块空白。
+  const hasEnabledProvider = providerStore.providers.some((p) => p.enabled);
   const [mcpEnabled, setMcpEnabled] = useState(false);
 
   useEffect(() => {
