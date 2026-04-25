@@ -5,9 +5,9 @@ import { createPersistStore } from "../utils/store";
 import { getClientConfig } from "../config/client";
 import yaml from "js-yaml";
 import { adapter, getOperationId } from "../utils";
-import { useAccessStore } from "./access";
 
 const isApp = getClientConfig()?.isApp !== false;
+const ENABLE_REMOTE_BUILTIN_PLUGIN_FETCH = false;
 
 export type Plugin = {
   id: string;
@@ -226,6 +226,9 @@ export const usePluginStore = createPersistStore(
     onRehydrateStorage(state) {
       // Skip store rehydration on server side
       if (typeof window === "undefined") {
+        return;
+      }
+      if (!ENABLE_REMOTE_BUILTIN_PLUGIN_FETCH) {
         return;
       }
 

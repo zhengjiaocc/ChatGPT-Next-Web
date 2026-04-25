@@ -124,6 +124,11 @@ export interface ChatSession {
   mask: Mask;
   messagesLoaded?: boolean;
   messageCount?: number;
+  /**
+   * Whether this session is stale compared to remote (updated elsewhere).
+   * Used to gate sending so model context stays consistent.
+   */
+  isStale?: boolean;
 }
 
 export const DEFAULT_TOPIC = Locale.Store.DefaultTopic;
@@ -230,7 +235,6 @@ function isLoggedIn() {
 type SessionSyncPayload = {
   id: string;
   title: string;
-  messages: ChatMessage[];
   model: string;
   mask: Mask;
   memoryPrompt: string;
@@ -256,12 +260,9 @@ function buildSessionSyncPayload(
 ): SessionSyncPayload | undefined {
   if (session.messagesLoaded === false) return;
   if (session.messages.length === 0 && session.topic === DEFAULT_TOPIC) return;
-  const messages = session.messages.filter((m) => !m.streaming);
-  if (messages.length === 0) return;
   return {
     id: session.id,
     title: session.topic,
-    messages,
     model: session.mask.modelConfig.model,
     mask: session.mask,
     memoryPrompt: session.memoryPrompt,
@@ -279,6 +280,33 @@ function getSessionMessageCount(session: ChatSession) {
   return session.messagesLoaded === false
     ? session.messageCount ?? 0
     : session.messages.length;
+}
+
+function getPersistableMessages(session: ChatSession) {
+  return (session.messages ?? []).filter(
+    (m) =>
+      !!m?.id &&
+      !m.streaming &&
+      !m.isError &&
+      getMessageTextContent(m).trim().length > 0,
+  );
+}
+
+function getPersistableMessageCount(session: ChatSession) {
+  if (session.messagesLoaded === false) return session.messageCount ?? 0;
+  return getPersistableMessages(session).length;
+}
+
+function getPersistableLastMessageId(session: ChatSession) {
+  if (session.messagesLoaded === false) return "";
+  return getPersistableMessages(session).at(-1)?.id ?? "";
+}
+
+function debugLog(...args: any[]) {
+  if (typeof process !== "undefined" && process.env.NODE_ENV === "production")
+    return;
+  // eslint-disable-next-line no-console
+  console.log(...args);
 }
 
 function shouldPreferLocalSession(local: ChatSession, cloud: ChatSession) {
@@ -299,17 +327,85 @@ function shouldPreferLocalSession(local: ChatSession, cloud: ChatSession) {
   return false;
 }
 
+function sanitizeSession(session: ChatSession): ChatSession {
+  const fixed = { ...session };
+  fixed.isStale = false;
+  const seenMessageIds = new Set<string>();
+  fixed.messages = (session.messages ?? []).filter((m) => {
+    const id = m?.id;
+    if (!id) return false;
+    if (seenMessageIds.has(id)) return false;
+    seenMessageIds.add(id);
+    return true;
+  });
+
+  fixed.lastSummarizeIndex = Math.max(
+    0,
+    Math.min(fixed.lastSummarizeIndex ?? 0, fixed.messages.length),
+  );
+
+  if (typeof fixed.clearContextIndex === "number") {
+    fixed.clearContextIndex = Math.max(
+      0,
+      Math.min(fixed.clearContextIndex, fixed.messages.length),
+    );
+  }
+
+  if (fixed.messagesLoaded !== false) {
+    fixed.messageCount = fixed.messages.length;
+  } else {
+    fixed.messageCount = Math.max(
+      fixed.messageCount ?? 0,
+      fixed.messages.length,
+    );
+  }
+
+  if (!fixed.lastUpdate || !Number.isFinite(fixed.lastUpdate)) {
+    const lastMsgTs = new Date(fixed.messages.at(-1)?.date ?? 0).getTime();
+    fixed.lastUpdate =
+      Number.isFinite(lastMsgTs) && lastMsgTs > 0 ? lastMsgTs : Date.now();
+  }
+
+  return fixed;
+}
+
+function sanitizeSessions(sessions: ChatSession[]): ChatSession[] {
+  const byId = new Map<string, ChatSession>();
+  for (const raw of sessions) {
+    const session = sanitizeSession(raw);
+    if (!session.id) continue;
+    const existed = byId.get(session.id);
+    if (!existed) {
+      byId.set(session.id, session);
+      continue;
+    }
+    byId.set(
+      session.id,
+      shouldPreferLocalSession(session, existed) ? session : existed,
+    );
+  }
+
+  const normalized = Array.from(byId.values())
+    .filter(isMeaningfulSession)
+    .sort((a, b) => (b.lastUpdate || 0) - (a.lastUpdate || 0));
+
+  return normalized.length > 0 ? normalized : [createEmptySession()];
+}
+
 async function syncSessionPayloadToDB(
   payload: SessionSyncPayload,
   retries = 3,
 ) {
   for (let i = 0; i < retries; i++) {
     try {
-      const res = await fetchWithTimeout("/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetchWithTimeout(
+        `/api/sessions/${encodeURIComponent(payload.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
       if (res.ok) return true;
     } catch (e) {
       if (i === retries - 1) console.error("[Sync] failed to sync session", e);
@@ -325,7 +421,10 @@ function trySendBeaconSync(payload: SessionSyncPayload) {
     const blob = new Blob([JSON.stringify(payload)], {
       type: "application/json",
     });
-    return navigator.sendBeacon("/api/sessions", blob);
+    return navigator.sendBeacon(
+      `/api/sessions/${encodeURIComponent(payload.id)}`,
+      blob,
+    );
   } catch {
     return false;
   }
@@ -384,6 +483,38 @@ async function syncSessionToDB(session: ChatSession) {
       void flushSessionSyncQueue(session.id);
     }, SESSION_SYNC_DEBOUNCE_MS),
   );
+}
+
+async function syncSessionMessagesToDB(
+  session: ChatSession,
+  messages: ChatMessage[],
+) {
+  if (!isLoggedIn()) return;
+  const appendMessages = messages.filter(
+    (m) =>
+      !!m?.id &&
+      !m.streaming &&
+      !m.isError &&
+      getMessageTextContent(m).trim().length > 0,
+  );
+  if (appendMessages.length === 0) return;
+  try {
+    await fetchWithTimeout(`/api/sessions/${session.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: session.topic,
+        messages: appendMessages,
+        model: session.mask.modelConfig.model,
+        mask: session.mask,
+        memoryPrompt: session.memoryPrompt,
+        memoryHistory: session.memoryHistory ?? [],
+        lastSummarizeIndex: session.lastSummarizeIndex,
+      }),
+    });
+  } catch (e) {
+    console.error("[Sync] failed to append session messages", e);
+  }
 }
 
 async function deleteSessionFromDB(id: string) {
@@ -621,6 +752,131 @@ export const useChatStore = createPersistStore(
           showToast("消息加载中，请稍候...");
           return;
         }
+
+        const refreshCurrentSession = async () => {
+          debugLog("[StaleGate] refresh clicked", {
+            sessionId: session.id,
+            localTs: session.lastUpdate || 0,
+            localPersistableCount: getPersistableMessageCount(session),
+            localPersistableLastId: getPersistableLastMessageId(session),
+            messagesLoaded: session.messagesLoaded !== false,
+          });
+          try {
+            // Force-reload current session messages and clear stale flag.
+            await get().loadSessionMessages(session.id, true);
+            get().updateTargetSession(
+              session,
+              (s) => {
+                s.isStale = false;
+              },
+              true,
+            );
+            const latest =
+              get().sessions.find((s) => s.id === session.id) ?? session;
+            debugLog("[StaleGate] refresh done", {
+              sessionId: latest.id,
+              localTs: latest.lastUpdate || 0,
+              localPersistableCount: getPersistableMessageCount(latest),
+              localPersistableLastId: getPersistableLastMessageId(latest),
+              messagesLoaded: latest.messagesLoaded !== false,
+              isStale: latest.isStale ?? false,
+            });
+          } catch {
+            location.reload();
+          }
+        };
+
+        // If the session is already known stale, block sending and ask user to refresh.
+        if (session.isStale) {
+          debugLog("[StaleGate] blocked: already stale", {
+            sessionId: session.id,
+            localTs: session.lastUpdate || 0,
+            localPersistableCount: getPersistableMessageCount(session),
+            localPersistableLastId: getPersistableLastMessageId(session),
+          });
+          showToast("该会话已在其他设备更新，请先刷新后再发送。", {
+            text: "刷新",
+            onClick: () => void refreshCurrentSession(),
+          });
+          return;
+        }
+
+        // Before sending: check if remote has newer updates (1 extra request).
+        if (isLoggedIn() && session.id) {
+          try {
+            const res = await fetchWithTimeout(
+              `/api/sessions/${encodeURIComponent(session.id)}?meta=1`,
+              undefined,
+              6000,
+            );
+            if (res.status === 401) {
+              useUserStore.getState().logout();
+              showToast("登录状态已失效，请重新登录");
+              return;
+            }
+            if (res.ok) {
+              const meta = (await res.json()) as any;
+              const remoteTs = new Date(meta?.updated_at ?? 0).getTime();
+              const remoteCount = Number(meta?.message_count ?? 0);
+              const remoteLastId = String(meta?.last_message_id ?? "");
+              const localCount = getPersistableMessageCount(session);
+              const localLastId = getPersistableLastMessageId(session);
+
+              // Stale detection primarily by message id.
+              // Fallback to count only when remote id is unavailable.
+              const hasRemoteLastId = remoteLastId.length > 0;
+              const lastIdMismatch =
+                hasRemoteLastId &&
+                !!localLastId &&
+                remoteLastId !== localLastId;
+              const countAhead =
+                Number.isFinite(remoteCount) && remoteCount > localCount;
+              const remoteNewer = hasRemoteLastId ? lastIdMismatch : countAhead;
+
+              debugLog("[StaleGate] meta check", {
+                sessionId: session.id,
+                remoteTs,
+                remoteCount,
+                remoteLastId,
+                localCount,
+                localLastId,
+                hasRemoteLastId,
+                lastIdMismatch,
+                remoteNewer,
+                // messagesLoaded is guaranteed here (checked at function start)
+                messagesLoaded: true,
+                localTailIds: getPersistableMessages(session)
+                  .slice(-5)
+                  .map((m) => m.id),
+              });
+              if (remoteNewer) {
+                get().updateTargetSession(
+                  session,
+                  (s) => {
+                    s.isStale = true;
+                    // Keep a hint so list rendering can reflect remote count.
+                    if (s.messagesLoaded === false)
+                      s.messageCount = Math.max(
+                        s.messageCount ?? 0,
+                        remoteCount,
+                      );
+                    if (Number.isFinite(remoteTs) && remoteTs > 0)
+                      s.lastUpdate = Math.max(s.lastUpdate || 0, remoteTs);
+                  },
+                  true,
+                );
+                debugLog("[StaleGate] marked stale", { sessionId: session.id });
+                showToast("该会话已在其他设备更新，请先刷新后再发送。", {
+                  text: "刷新",
+                  onClick: () => void refreshCurrentSession(),
+                });
+                return;
+              }
+            }
+          } catch {
+            // best-effort; ignore
+          }
+        }
         const modelConfig = session.mask.modelConfig;
 
         if (!modelConfig.model || !modelConfig.providerName) {
@@ -669,12 +925,16 @@ export const useChatStore = createPersistStore(
         const messageIndex = session.messages.length + 2;
 
         // save user's and bot's message immediately so UI shows them
-        get().updateTargetSession(session, (session) => {
-          session.messages = session.messages.concat([
-            { ...userMessage, content: mContent },
-            botMessage,
-          ]);
-        });
+        get().updateTargetSession(
+          session,
+          (session) => {
+            session.messages = session.messages.concat([
+              { ...userMessage, content: mContent },
+              botMessage,
+            ]);
+          },
+          true,
+        );
 
         const matchedProvider = useProviderStore
           .getState()
@@ -712,12 +972,16 @@ export const useChatStore = createPersistStore(
               botMessage.content = message;
               botMessage.date = new Date().toLocaleString();
             }
-            get().updateTargetSession(session, (session) => {
-              session.messages = session.messages.map((m) =>
-                m.id === botMessage.id ? { ...botMessage } : m,
-              );
-              session.lastUpdate = Date.now();
-            });
+            get().updateTargetSession(
+              session,
+              (session) => {
+                session.messages = session.messages.map((m) =>
+                  m.id === botMessage.id ? { ...botMessage } : m,
+                );
+                session.lastUpdate = Date.now();
+              },
+              true,
+            );
             if (message) get().updateStat(botMessage, session);
             get().checkMcpJson(botMessage);
             get().summarizeSession(
@@ -725,6 +989,13 @@ export const useChatStore = createPersistStore(
               get().sessions.find((s) => s.id === session.id) ?? session,
             );
             ChatControllerPool.remove(session.id, botMessage.id);
+            const latestSession =
+              get().sessions.find((s) => s.id === session.id) ?? session;
+            // append-only sync for the newly completed round
+            void syncSessionMessagesToDB(latestSession, [
+              userMessage,
+              botMessage,
+            ]);
             // sync ASAP so other devices can see new messages quickly
             void flushSessionSyncQueue(session.id);
           },
@@ -1128,12 +1399,36 @@ export const useChatStore = createPersistStore(
             return;
           }
           const rows = await res.json();
+          const localSessions = sanitizeSessions(get().sessions).filter(
+            isMeaningfulSession,
+          );
           if (!Array.isArray(rows) || rows.length === 0) {
-            set({
-              sessions: [createEmptySession()],
-              dbLoaded: true,
-              dbLoadState: "ready",
-            });
+            if (localSessions.length > 0) {
+              const sessions = sanitizeSessions(localSessions);
+              const prevCurrentId = get().currentSession()?.id;
+              const localCurrentIndex = prevCurrentId
+                ? sessions.findIndex((s) => s.id === prevCurrentId)
+                : -1;
+              set({
+                sessions,
+                currentSessionIndex:
+                  localCurrentIndex >= 0 ? localCurrentIndex : 0,
+                dbLoaded: true,
+                dbLoadState: "ready",
+              });
+              sessions.forEach((session) => {
+                if (isMeaningfulSession(session)) {
+                  void syncSessionMessagesToDB(session, session.messages);
+                  void syncSessionToDB(session);
+                }
+              });
+            } else {
+              set({
+                sessions: [createEmptySession()],
+                dbLoaded: true,
+                dbLoadState: "ready",
+              });
+            }
             return;
           }
           const filteredRows = rows.filter(
@@ -1144,11 +1439,32 @@ export const useChatStore = createPersistStore(
             .filter((r: any) => !filteredRows.includes(r))
             .forEach((r: any) => deleteSessionFromDB(r.id));
           if (!filteredRows.length) {
-            set({
-              sessions: [createEmptySession()],
-              dbLoaded: true,
-              dbLoadState: "ready",
-            });
+            if (localSessions.length > 0) {
+              const sessions = sanitizeSessions(localSessions);
+              const prevCurrentId = get().currentSession()?.id;
+              const localCurrentIndex = prevCurrentId
+                ? sessions.findIndex((s) => s.id === prevCurrentId)
+                : -1;
+              set({
+                sessions,
+                currentSessionIndex:
+                  localCurrentIndex >= 0 ? localCurrentIndex : 0,
+                dbLoaded: true,
+                dbLoadState: "ready",
+              });
+              sessions.forEach((session) => {
+                if (isMeaningfulSession(session)) {
+                  void syncSessionMessagesToDB(session, session.messages);
+                  void syncSessionToDB(session);
+                }
+              });
+            } else {
+              set({
+                sessions: [createEmptySession()],
+                dbLoaded: true,
+                dbLoadState: "ready",
+              });
+            }
             return;
           }
           const providers = useProviderStore.getState().providers;
@@ -1160,6 +1476,7 @@ export const useChatStore = createPersistStore(
               messages: [],
               messagesLoaded: false as const,
               messageCount: r.message_count ?? 0,
+              isStale: false,
               mask: r.mask ?? createEmptyMask(),
               memoryPrompt: r.memory_prompt ?? "",
               memoryHistory: r.memory_history ?? [],
@@ -1202,7 +1519,6 @@ export const useChatStore = createPersistStore(
             mergedById.set(s.id, { session: s, localPreferred: false });
           }
 
-          const localSessions = get().sessions.filter(isMeaningfulSession);
           for (const local of localSessions) {
             const existed = mergedById.get(local.id);
             if (!existed) {
@@ -1220,9 +1536,11 @@ export const useChatStore = createPersistStore(
             }
           }
 
-          const sessions = Array.from(mergedById.values())
-            .map((v) => v.session)
-            .sort((a, b) => (b.lastUpdate || 0) - (a.lastUpdate || 0));
+          const sessions = sanitizeSessions(
+            Array.from(mergedById.values())
+              .map((v) => v.session)
+              .sort((a, b) => (b.lastUpdate || 0) - (a.lastUpdate || 0)),
+          );
 
           const prevCurrentId = get().currentSession()?.id;
           const mergedCurrentIndex = prevCurrentId
@@ -1239,6 +1557,7 @@ export const useChatStore = createPersistStore(
           // Push local-preferred merged sessions back to cloud ASAP.
           mergedById.forEach(({ session, localPreferred }) => {
             if (localPreferred && isMeaningfulSession(session)) {
+              void syncSessionMessagesToDB(session, session.messages);
               void syncSessionToDB(session);
             }
           });
@@ -1258,10 +1577,12 @@ export const useChatStore = createPersistStore(
         });
       },
 
-      async loadSessionMessages(sessionId: string) {
+      async loadSessionMessages(sessionId: string, force = false) {
         const index = get().sessions.findIndex((s) => s.id === sessionId);
-        if (index < 0 || get().sessions[index].messagesLoaded) return;
+        if (index < 0) return;
+        if (!force && get().sessions[index].messagesLoaded) return;
         try {
+          debugLog("[Session] loadSessionMessages start", { sessionId, force });
           const res = await fetchWithTimeout(`/api/sessions/${sessionId}`);
           if (res.status === 401) {
             useUserStore.getState().logout();
@@ -1273,12 +1594,32 @@ export const useChatStore = createPersistStore(
             const idx = state.sessions.findIndex((s) => s.id === sessionId);
             if (idx < 0) return state;
             const updated = [...state.sessions];
+            const remoteTs = new Date((row as any)?.updated_at ?? 0).getTime();
+            const nextMessages = (row as any)?.messages ?? [];
             updated[idx] = {
               ...updated[idx],
-              messages: row.messages ?? [],
+              messages: nextMessages,
               messagesLoaded: true,
+              isStale: false,
+              messageCount: Array.isArray(nextMessages)
+                ? nextMessages.length
+                : updated[idx].messageCount,
+              lastUpdate:
+                Number.isFinite(remoteTs) && remoteTs > 0
+                  ? remoteTs
+                  : updated[idx].lastUpdate,
             };
             return { sessions: updated };
+          });
+          debugLog("[Session] loadSessionMessages ok", {
+            sessionId,
+            remoteTs: new Date((row as any)?.updated_at ?? 0).getTime(),
+            remoteCount: Array.isArray((row as any)?.messages)
+              ? (row as any).messages.length
+              : undefined,
+            remoteLastId: Array.isArray((row as any)?.messages)
+              ? (row as any).messages.at(-1)?.id
+              : undefined,
           });
         } catch (e) {
           console.error("[Chat] failed to load session messages", e);
@@ -1386,6 +1727,14 @@ export const useChatStore = createPersistStore(
         });
       }
 
+      newState.sessions = sanitizeSessions(newState.sessions as ChatSession[]);
+      if (
+        typeof newState.currentSessionIndex !== "number" ||
+        newState.currentSessionIndex < 0 ||
+        newState.currentSessionIndex >= newState.sessions.length
+      ) {
+        newState.currentSessionIndex = 0;
+      }
       return newState as any;
     },
     partialize: (state) => {
