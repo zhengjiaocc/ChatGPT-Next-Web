@@ -2324,10 +2324,11 @@ function _Chat() {
                                 <div
                                   key={i}
                                   style={{
-                                    marginBottom: 12,
-                                    border: "1px solid var(--border-in-light)",
-                                    borderRadius: 8,
+                                    marginBottom: 16,
+                                    border: "2px solid var(--border-in-light)",
+                                    borderRadius: 10,
                                     background: "var(--white)",
+                                    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
                                   }}
                                 >
                                   <details open={i === 0}>
@@ -2336,32 +2337,58 @@ function _Chat() {
                                         display: "flex",
                                         justifyContent: "space-between",
                                         alignItems: "center",
-                                        padding: "10px 14px",
-                                        fontSize: 12,
+                                        padding: "12px 16px",
+                                        fontSize: 13,
                                         cursor: "pointer",
                                         listStyle: "none",
+                                        background: "var(--second)",
+                                        borderRadius: "8px 8px 0 0",
                                       }}
                                     >
                                       <span style={{ fontWeight: "bold" }}>
                                         第 {arr.length - i} 次压缩
-                                        {entry.isUpdate
-                                          ? "（合并更新）"
-                                          : "（首次）"}
+                                        <span
+                                          style={{
+                                            fontWeight: "normal",
+                                            opacity: 0.6,
+                                            marginLeft: 6,
+                                          }}
+                                        >
+                                          {entry.isUpdate ? "合并更新" : "首次"}
+                                        </span>
+                                        {(entry.toIndex > 0 ||
+                                          entry.fromIndex >= 0) && (
+                                          <span
+                                            style={{
+                                              fontWeight: "normal",
+                                              opacity: 0.6,
+                                              marginLeft: 8,
+                                              fontSize: 12,
+                                            }}
+                                          >
+                                            · 消息 {entry.fromIndex}–
+                                            {entry.toIndex}
+                                          </span>
+                                        )}
                                       </span>
                                       <span
-                                        style={{ opacity: 0.5, fontSize: 11 }}
+                                        style={{
+                                          opacity: 0.5,
+                                          fontSize: 11,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 8,
+                                        }}
                                       >
-                                        {entry.fromIndex > 0 &&
-                                          `消息 ${entry.fromIndex}–${entry.toIndex}`}
                                         {entry.createdAt > 0 &&
-                                          `  ${new Date(
+                                          new Date(
                                             entry.createdAt,
-                                          ).toLocaleString()}`}
+                                          ).toLocaleString()}
                                         {i === 0 && (
                                           <span
                                             style={{
                                               color: "var(--primary)",
-                                              marginLeft: 8,
+                                              fontWeight: "bold",
                                             }}
                                           >
                                             最新
@@ -2373,9 +2400,7 @@ function _Chat() {
                                       style={{
                                         fontSize: 13,
                                         lineHeight: 1.6,
-                                        padding: "0 14px 10px",
-                                        borderTop:
-                                          "1px solid var(--border-in-light)",
+                                        padding: "12px 16px",
                                       }}
                                     >
                                       <Markdown
