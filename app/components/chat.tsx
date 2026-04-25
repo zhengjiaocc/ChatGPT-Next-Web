@@ -1852,48 +1852,7 @@ function _Chat() {
                     // 计算发送该消息时携带的上下文信息
                     const msgContextInfo = (() => {
                       if (!isUser || isContext) return null;
-                      const modelConfig = session.mask.modelConfig;
-                      const clearIdx = session.clearContextIndex ?? 0;
-                      const sessionMsgIndex = session.messages.findIndex(
-                        (m) => m.id === message.id,
-                      );
-                      if (sessionMsgIndex < 0) return null;
-
-                      // always compute from current session.messages (real-time, accurate after resend)
-                      const hasLongTermMemory =
-                        modelConfig.sendMemory &&
-                        !!session.memoryPrompt &&
-                        session.memoryPrompt.length > 0 &&
-                        session.lastSummarizeIndex > clearIdx;
-                      const effectiveStart = Math.max(
-                        clearIdx,
-                        hasLongTermMemory ? session.lastSummarizeIndex : 0,
-                      );
-                      const historyStart = Math.max(
-                        effectiveStart,
-                        sessionMsgIndex - modelConfig.historyMessageCount,
-                      );
-                      const historyMessages = session.messages
-                        .slice(historyStart, sessionMsgIndex)
-                        .filter((m) => !m.isError)
-                        .map((m) => ({
-                          role: m.role,
-                          content: getMessageTextContent(m),
-                        }));
-                      const firstUser = historyMessages.findIndex(
-                        (m) => m.role === "user",
-                      );
-                      const trimmedHistory =
-                        firstUser > 0
-                          ? historyMessages.slice(firstUser)
-                          : historyMessages;
-                      return {
-                        sentCount: trimmedHistory.length,
-                        hasLongTermMemory,
-                        memoryPrompt: session.memoryPrompt,
-                        contextPromptsCount: session.mask.context.length,
-                        historyMessages: trimmedHistory,
-                      };
+                      return message.contextInfo ?? null;
                     })();
 
                     return (
