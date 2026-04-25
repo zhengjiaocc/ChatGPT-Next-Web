@@ -209,6 +209,7 @@
     border-radius: 10px;
     padding: 10px;
     font-size: 12px;
+    -webkit-user-select: text;
     user-select: text;
   }
 }
@@ -475,6 +476,7 @@
   background-color: rgba(0, 0, 0, 0.05);
   padding: 10px;
   font-size: 14px;
+  -webkit-user-select: text;
   user-select: text;
   word-break: break-word;
   border: var(--border-in-light);
@@ -493,6 +495,7 @@
   transition: all ease 0.3s;
   margin-top: 10px;
   font-size: 14px;
+  -webkit-user-select: text;
   user-select: text;
   word-break: break-word;
   box-sizing: border-box;

@@ -1484,17 +1484,17 @@ export const useChatStore = createPersistStore(
           if (!res.ok) throw new Error(`load failed: ${res.status}`);
           const row = await res.json();
           const nextMessages: ChatMessage[] = (row as any)?.messages ?? [];
+          const cloudIds = new Set(nextMessages.map((m) => m.id));
+          let localAhead = false;
           set((state) => {
             const idx = state.sessions.findIndex((s) => s.id === sessionId);
             if (idx < 0) return state;
             const current = state.sessions[idx];
-            // Keep local if it has unsync'd messages (local last msg id not in cloud)
             const localLastId =
               current.messages.length > 0
                 ? current.messages[current.messages.length - 1]?.id ?? ""
                 : "";
-            const cloudIds = new Set(nextMessages.map((m) => m.id));
-            const localAhead = localLastId !== "" && !cloudIds.has(localLastId);
+            localAhead = localLastId !== "" && !cloudIds.has(localLastId);
             const updated = [...state.sessions];
             updated[idx] = {
               ...current,
@@ -1507,15 +1507,9 @@ export const useChatStore = createPersistStore(
             return { sessions: updated };
           });
           // If local was ahead, push local messages to cloud immediately
-          const finalSession = get().sessions.find((s) => s.id === sessionId);
-          if (
-            finalSession?.messagesLoaded &&
-            finalSession.messages.length > 0
-          ) {
-            const cloudIds2 = new Set(nextMessages.map((m) => m.id));
-            const localLastId2 =
-              finalSession.messages[finalSession.messages.length - 1]?.id ?? "";
-            if (localLastId2 && !cloudIds2.has(localLastId2)) {
+          if (localAhead) {
+            const finalSession = get().sessions.find((s) => s.id === sessionId);
+            if (finalSession) {
               void syncSessionMessagesToDB(finalSession, finalSession.messages);
             }
           }
