@@ -1252,6 +1252,10 @@ function _Chat() {
   };
 
   const onResend = (message: ChatMessage) => {
+    // Ensure no in-flight stream keeps updating truncated messages.
+    // Otherwise a late onUpdate/onFinish may re-introduce "future" assistant content.
+    ChatControllerPool.stopAll();
+
     const resendingIndex = session.messages.findIndex(
       (m) => m.id === message.id,
     );
@@ -1287,10 +1291,19 @@ function _Chat() {
     // truncate the messages from the user message index
     chatStore.updateTargetSession(session, (session) => {
       session.messages.splice(userMessageIndex);
+      // force replace reference so subsequent reads never see stale array
+      session.messages = session.messages.slice();
       // if memory was summarized beyond the truncation point, discard it
       if (session.lastSummarizeIndex > userMessageIndex) {
         session.lastSummarizeIndex = 0;
         session.memoryPrompt = "";
+      }
+      // keep clearContextIndex within bounds after truncation
+      if (
+        typeof session.clearContextIndex === "number" &&
+        session.clearContextIndex > session.messages.length
+      ) {
+        session.clearContextIndex = session.messages.length;
       }
     });
 

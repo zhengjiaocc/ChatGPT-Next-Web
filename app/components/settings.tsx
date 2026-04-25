@@ -347,6 +347,7 @@ export function Settings() {
   }
 
   const promptStore = usePromptStore();
+  const chatStore = useChatStore();
   const builtinCount = SearchService.count.builtin;
   const customCount = promptStore.getUserPrompts().length ?? 0;
   const [shouldShowPromptModal, setShowPromptModal] = useState(false);

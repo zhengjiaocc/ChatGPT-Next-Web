@@ -76,13 +76,9 @@ export function MessageSelector(props: {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
   const isValid = (m: ChatMessage) => m.content && !m.isError && !m.streaming;
-  const allMessages = useMemo(() => {
-    let startIndex = Math.max(0, session.clearContextIndex ?? 0);
-    if (startIndex === session.messages.length - 1) {
-      startIndex = 0;
-    }
-    return session.messages.slice(startIndex);
-  }, [session.messages, session.clearContextIndex]);
+  // Export should be based on full persisted conversation history.
+  // `clearContextIndex` only controls model context, not archive/export scope.
+  const allMessages = useMemo(() => session.messages, [session.messages]);
 
   const messages = useMemo(
     () =>

@@ -242,6 +242,7 @@ const SESSION_SYNC_DEBOUNCE_MS = 500;
 const sessionSyncTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingSessionSyncPayload = new Map<string, SessionSyncPayload>();
 const sessionSyncRunning = new Map<string, boolean>();
+let syncFlushEventsInstalled = false;
 
 function clearAllSessionSyncTasks() {
   sessionSyncTimers.forEach((timer) => clearTimeout(timer));
@@ -269,6 +270,35 @@ function buildSessionSyncPayload(
   };
 }
 
+function isMeaningfulSession(session?: ChatSession) {
+  if (!session) return false;
+  return session.messages.length > 0 || session.topic !== DEFAULT_TOPIC;
+}
+
+function getSessionMessageCount(session: ChatSession) {
+  return session.messagesLoaded === false
+    ? session.messageCount ?? 0
+    : session.messages.length;
+}
+
+function shouldPreferLocalSession(local: ChatSession, cloud: ChatSession) {
+  const localTs = local.lastUpdate || 0;
+  const cloudTs = cloud.lastUpdate || 0;
+  // Timestamp wins first (allow tiny clock drifts).
+  if (localTs > cloudTs + 1000) return true;
+  if (cloudTs > localTs + 1000) return false;
+
+  // If timestamps are close, prefer the one that has more visible messages.
+  const localCount = getSessionMessageCount(local);
+  const cloudCount = getSessionMessageCount(cloud);
+  if (localCount !== cloudCount) return localCount > cloudCount;
+
+  // Final fallback: prefer loaded local messages to avoid losing recent unsynced turns.
+  if (local.messagesLoaded !== false && cloud.messagesLoaded === false)
+    return true;
+  return false;
+}
+
 async function syncSessionPayloadToDB(
   payload: SessionSyncPayload,
   retries = 3,
@@ -286,6 +316,38 @@ async function syncSessionPayloadToDB(
     }
   }
   return false;
+}
+
+function trySendBeaconSync(payload: SessionSyncPayload) {
+  if (typeof navigator === "undefined") return false;
+  if (typeof navigator.sendBeacon !== "function") return false;
+  try {
+    const blob = new Blob([JSON.stringify(payload)], {
+      type: "application/json",
+    });
+    return navigator.sendBeacon("/api/sessions", blob);
+  } catch {
+    return false;
+  }
+}
+
+function ensureSyncFlushEvents() {
+  if (syncFlushEventsInstalled) return;
+  if (typeof window === "undefined") return;
+  syncFlushEventsInstalled = true;
+
+  const flushAll = () => {
+    pendingSessionSyncPayload.forEach((payload) => {
+      // best-effort during page hide/unload
+      trySendBeaconSync(payload);
+    });
+  };
+
+  window.addEventListener("beforeunload", flushAll);
+  window.addEventListener("pagehide", flushAll);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushAll();
+  });
 }
 
 async function flushSessionSyncQueue(sessionId: string, depth = 0) {
@@ -308,6 +370,7 @@ async function flushSessionSyncQueue(sessionId: string, depth = 0) {
 
 async function syncSessionToDB(session: ChatSession) {
   if (!isLoggedIn()) return;
+  ensureSyncFlushEvents();
   const payload = buildSessionSyncPayload(session);
   if (!payload) return;
 
@@ -662,6 +725,8 @@ export const useChatStore = createPersistStore(
               get().sessions.find((s) => s.id === session.id) ?? session,
             );
             ChatControllerPool.remove(session.id, botMessage.id);
+            // sync ASAP so other devices can see new messages quickly
+            void flushSessionSyncQueue(session.id);
           },
           onBeforeTool(tool: ChatMessageTool) {
             (botMessage.tools = botMessage?.tools || []).push(tool);
@@ -1087,7 +1152,7 @@ export const useChatStore = createPersistStore(
             return;
           }
           const providers = useProviderStore.getState().providers;
-          const sessions: ChatSession[] = filteredRows.map((r: any) => {
+          const cloudSessions: ChatSession[] = filteredRows.map((r: any) => {
             const session = {
               ...createEmptySession(),
               id: r.id,
@@ -1126,12 +1191,58 @@ export const useChatStore = createPersistStore(
             }
             return session;
           });
+
+          // Merge cloud sessions with hydrated local sessions.
+          // This prevents cloud stale snapshots from overriding recent local turns.
+          const mergedById = new Map<
+            string,
+            { session: ChatSession; localPreferred: boolean }
+          >();
+          for (const s of cloudSessions) {
+            mergedById.set(s.id, { session: s, localPreferred: false });
+          }
+
+          const localSessions = get().sessions.filter(isMeaningfulSession);
+          for (const local of localSessions) {
+            const existed = mergedById.get(local.id);
+            if (!existed) {
+              mergedById.set(local.id, {
+                session: local,
+                localPreferred: true,
+              });
+              continue;
+            }
+            if (shouldPreferLocalSession(local, existed.session)) {
+              mergedById.set(local.id, {
+                session: local,
+                localPreferred: true,
+              });
+            }
+          }
+
+          const sessions = Array.from(mergedById.values())
+            .map((v) => v.session)
+            .sort((a, b) => (b.lastUpdate || 0) - (a.lastUpdate || 0));
+
+          const prevCurrentId = get().currentSession()?.id;
+          const mergedCurrentIndex = prevCurrentId
+            ? sessions.findIndex((s) => s.id === prevCurrentId)
+            : -1;
           set({
             sessions,
-            currentSessionIndex: 0,
+            currentSessionIndex:
+              mergedCurrentIndex >= 0 ? mergedCurrentIndex : 0,
             dbLoaded: true,
             dbLoadState: "ready",
           });
+
+          // Push local-preferred merged sessions back to cloud ASAP.
+          mergedById.forEach(({ session, localPreferred }) => {
+            if (localPreferred && isMeaningfulSession(session)) {
+              void syncSessionToDB(session);
+            }
+          });
+
           // 预取第一个 session 的消息，避免等待 React 渲染周期
           if (sessions.length > 0) {
             void get().loadSessionMessages(sessions[0].id);
