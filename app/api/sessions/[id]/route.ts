@@ -68,7 +68,7 @@ export async function POST(
     )
     ON CONFLICT (id) DO UPDATE SET
       title = EXCLUDED.title,
-      messages = EXCLUDED.messages,
+      messages = CASE WHEN jsonb_array_length(EXCLUDED.messages) > 0 THEN EXCLUDED.messages ELSE chat_sessions.messages END,
       model = EXCLUDED.model,
       mask = EXCLUDED.mask,
       memory_prompt = EXCLUDED.memory_prompt,
