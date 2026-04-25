@@ -49,21 +49,55 @@ function ChatListChunkPlaceholder() {
     <div className={styles["chat-list"]}>
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className={styles["chat-item"]}>
-          <div
-            className={`${styles["chat-item-title"]} ${styles["skeleton-item"]}`}
-            style={{
-              color: "transparent",
-              borderRadius: 4,
-              width: i % 2 === 0 ? "75%" : "55%",
-            }}
-          >
-            {"\u200b"}
+          <div className={styles["chat-item-title"]}>
+            <span
+              className={styles["skeleton-item"]}
+              style={{
+                display: "inline-block",
+                verticalAlign: "middle",
+                height: 14,
+                width: "4.25em",
+                maxWidth: 76,
+                borderRadius: 4,
+                color: "transparent",
+              }}
+            >
+              {"\u200b"}
+            </span>
           </div>
-          <div
-            className={`${styles["chat-item-info"]} ${styles["skeleton-item"]}`}
-            style={{ color: "transparent", borderRadius: 4, width: "45%" }}
-          >
-            {"\u200b"}
+          <div className={styles["chat-item-info"]}>
+            <div className={styles["chat-item-count"]}>
+              <span
+                className={styles["skeleton-item"]}
+                style={{
+                  display: "inline-block",
+                  height: 12,
+                  width: i % 2 === 0 ? "6.5em" : "5.5em",
+                  minWidth: 72,
+                  maxWidth: 132,
+                  borderRadius: 4,
+                  color: "transparent",
+                }}
+              >
+                {"\u200b"}
+              </span>
+            </div>
+            <div className={styles["chat-item-date"]}>
+              <span
+                className={styles["skeleton-item"]}
+                style={{
+                  display: "inline-block",
+                  height: 12,
+                  width: "11em",
+                  minWidth: 128,
+                  maxWidth: 188,
+                  borderRadius: 4,
+                  color: "transparent",
+                }}
+              >
+                {"\u200b"}
+              </span>
+            </div>
           </div>
         </div>
       ))}

@@ -83,6 +83,7 @@ import Locale from "../locales";
 
 import { IconButton } from "./button";
 import styles from "./chat.module.scss";
+import homeStyles from "./home.module.scss";
 
 import {
   List,
@@ -1072,6 +1073,9 @@ function _Chat() {
   const [hitBottom, setHitBottom] = useState(true);
   const isMobileScreen = useMobileScreen();
   const navigate = useNavigate();
+
+  /** 与 ChatList 一致：会话列表未完成云同步前，标题区也显示占位（避免空会话时右侧全白、百分比宽度为 0 导致占位不可见等问题）。 */
+  const chatHeaderLoading = !chatStore.dbLoaded;
   const [attachImages, setAttachImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
 
@@ -1671,12 +1675,54 @@ function _Chat() {
                 "window-header-main-title",
                 styles["chat-body-main-title"],
               )}
-              onClickCapture={() => setIsEditingMessage(true)}
+              onClickCapture={() => {
+                if (!chatStore.dbLoaded) return;
+                setIsEditingMessage(true);
+              }}
             >
-              {!session.topic ? DEFAULT_TOPIC : session.topic}
+              {chatHeaderLoading ? (
+                <div
+                  className={homeStyles["skeleton-item"]}
+                  style={{
+                    height: 18,
+                    width: 112,
+                    minWidth: 88,
+                    maxWidth: "min(32vw, 160px)",
+                    flexShrink: 0,
+                    color: "transparent",
+                  }}
+                >
+                  {"\u200b"}
+                </div>
+              ) : !session.topic ? (
+                DEFAULT_TOPIC
+              ) : (
+                session.topic
+              )}
             </div>
             <div className="window-header-sub-title">
-              {Locale.Chat.SubTitle(session.messages.length)}
+              {chatHeaderLoading ? (
+                <div
+                  className={homeStyles["skeleton-item"]}
+                  style={{
+                    height: 14,
+                    width: "min(42vw, 192px)",
+                    minWidth: 112,
+                    maxWidth: 208,
+                    marginTop: 6,
+                    flexShrink: 0,
+                    color: "transparent",
+                  }}
+                >
+                  {"\u200b"}
+                </div>
+              ) : (
+                Locale.Chat.SubTitle(
+                  session.messagesLoaded === false
+                    ? session.messageCount ?? session.messages.length
+                    : session.messages.length,
+                )
+              )}
             </div>
           </div>
           <div className="window-actions">
@@ -1715,76 +1761,6 @@ function _Chat() {
                   title={Locale.Chat.EditMessage.Title}
                   aria={Locale.Chat.EditMessage.Title}
                   onClick={() => setIsEditingMessage(true)}
-                />
-              </div>
-            )}
-            {(session.memoryHistory?.length ?? 0) > 0 && (
-              <div className="window-action-button">
-                <IconButton
-                  icon={<BrainIcon />}
-                  bordered
-                  title={`压缩历史 (${session.memoryHistory.length})`}
-                  onClick={() =>
-                    showModal({
-                      title: `压缩历史记录 (${session.memoryHistory.length} 条)`,
-                      children: (
-                        <div
-                          style={{
-                            maxHeight: "60vh",
-                            overflowY: "auto",
-                            padding: "0 16px",
-                          }}
-                        >
-                          {session.memoryHistory
-                            .slice()
-                            .reverse()
-                            .map((h, i, arr) => (
-                              <div
-                                key={i}
-                                style={{
-                                  marginBottom: 12,
-                                  border: "1px solid var(--border-in-light)",
-                                  borderRadius: 8,
-                                  padding: "10px 14px",
-                                  background: "var(--white)",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    marginBottom: 8,
-                                    fontSize: 12,
-                                    opacity: 0.5,
-                                  }}
-                                >
-                                  <span>第 {arr.length - i} 次压缩</span>
-                                  {i === 0 && (
-                                    <span
-                                      style={{
-                                        color: "var(--primary)",
-                                        opacity: 1,
-                                      }}
-                                    >
-                                      最新
-                                    </span>
-                                  )}
-                                </div>
-                                <div
-                                  style={{
-                                    whiteSpace: "pre-wrap",
-                                    fontSize: 13,
-                                    lineHeight: 1.6,
-                                  }}
-                                >
-                                  {h}
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      ),
-                    })
-                  }
                 />
               </div>
             )}
@@ -1833,6 +1809,7 @@ function _Chat() {
                 setAutoScroll(false);
               }}
             >
+              {/* 会话列表与消息体分两次请求：始终用同一套居中转圈，避免“先转完再转一遍”的观感 */}
               {session.messagesLoaded === false || !chatStore.dbLoaded ? (
                 <div
                   style={{
@@ -2551,5 +2528,10 @@ export function Chat() {
     );
   }
 
-  return <_Chat key={session.id}></_Chat>;
+  // 列表未就绪前固定 key，避免 clearSessions → loadFromDB 期间 session.id 变化导致 _Chat 反复卸载，
+  // 从而头部比侧栏晚一帧才挂上真实标题/条数。
+  const chatMountKey = chatStore.dbLoaded
+    ? session?.id ?? "__chat_empty__"
+    : "__chat_boot__";
+  return <_Chat key={chatMountKey}></_Chat>;
 }
