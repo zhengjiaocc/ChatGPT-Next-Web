@@ -1421,16 +1421,25 @@ export const useChatStore = createPersistStore(
           }
           const hidden = new Set<string>(get().hiddenSessionIds ?? []);
           const providers = useProviderStore.getState().providers;
+          const localSessionMap = new Map(localSessions.map((s) => [s.id, s]));
           const cloudSessions: ChatSession[] = filteredRows
             .filter((r: any) => !hidden.has(r.id))
             .map((r: any) => {
+              const local = localSessionMap.get(r.id);
+              const localMessages =
+                local?.messagesLoaded && local.messages.length > 0
+                  ? local.messages
+                  : [];
               const session = {
                 ...createEmptySession(),
                 id: r.id,
                 topic: r.title,
-                messages: [],
-                messagesLoaded: false as const,
-                messageCount: r.message_count ?? 0,
+                messages: localMessages,
+                messagesLoaded: localMessages.length > 0,
+                messageCount: Math.max(
+                  r.message_count ?? 0,
+                  localMessages.length,
+                ),
                 mask: r.mask ?? createEmptyMask(),
                 memoryPrompt: r.memory_prompt ?? "",
                 memoryHistory: r.memory_history ?? [],
