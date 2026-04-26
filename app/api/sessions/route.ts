@@ -11,7 +11,8 @@ export async function GET(req: NextRequest) {
 
   const sessions = await sql`
     SELECT id, title, model, mask, memory_prompt, memory_history, last_summarize_index, updated_at,
-      jsonb_array_length(messages) AS message_count
+      jsonb_array_length(messages) AS message_count,
+      messages->-1->>'id' AS last_message_id
     FROM chat_sessions
     WHERE user_id = ${user.id} ORDER BY updated_at DESC
     LIMIT 50

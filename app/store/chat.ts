@@ -485,6 +485,7 @@ async function syncSessionMessagesToDB(
     try {
       const res = await fetchWithTimeout(`/api/sessions/${session.id}`, {
         method: "POST",
+        keepalive: true,
         headers: { "Content-Type": "application/json" },
         body,
       });
@@ -889,6 +890,14 @@ export const useChatStore = createPersistStore(
             ]);
           },
           true,
+        );
+        // Persist user message immediately so abrupt tab close during streaming
+        // does not lose newly sent input.
+        const sessionAfterAppend =
+          get().sessions.find((s) => s.id === session.id) ?? session;
+        void syncSessionMessagesToDB(
+          sessionAfterAppend,
+          sessionAfterAppend.messages,
         );
 
         const matchedProvider = useProviderStore
@@ -1451,21 +1460,39 @@ export const useChatStore = createPersistStore(
                 local?.messages && local.messages.length > 0
                   ? local.messages
                   : [];
+              const cloudMessageCount = r.message_count ?? 0;
+              const cloudLastMessageId = r.last_message_id ?? "";
+              const cloudUpdatedAt = new Date(r.updated_at).getTime();
+              const localUpdatedAt = local?.lastUpdate ?? 0;
+              const localLastMessageId =
+                localMessages.length > 0
+                  ? localMessages[localMessages.length - 1]?.id ?? ""
+                  : "";
+              const localIsAhead =
+                localMessages.length > cloudMessageCount &&
+                localUpdatedAt > cloudUpdatedAt;
+              const localMatchesCloud =
+                localMessages.length > 0 &&
+                localMessages.length === cloudMessageCount &&
+                (cloudLastMessageId
+                  ? localLastMessageId === cloudLastMessageId
+                  : true);
+              const shouldReuseLocalMessages =
+                localIsAhead || localMatchesCloud;
               const session = {
                 ...createEmptySession(),
                 id: r.id,
                 topic: r.title,
-                messages: localMessages,
-                messagesLoaded: localMessages.length > 0,
-                messageCount: Math.max(
-                  r.message_count ?? 0,
-                  localMessages.length,
-                ),
+                messages: shouldReuseLocalMessages ? localMessages : [],
+                messagesLoaded: shouldReuseLocalMessages,
+                messageCount: localIsAhead
+                  ? localMessages.length
+                  : cloudMessageCount,
                 mask: r.mask ?? createEmptyMask(),
                 memoryPrompt: r.memory_prompt ?? "",
                 memoryHistory: r.memory_history ?? [],
                 lastSummarizeIndex: r.last_summarize_index ?? 0,
-                lastUpdate: new Date(r.updated_at).getTime(),
+                lastUpdate: cloudUpdatedAt,
               };
               // Auto-fill providerId if missing
               if (!session.mask.modelConfig.providerId) {
