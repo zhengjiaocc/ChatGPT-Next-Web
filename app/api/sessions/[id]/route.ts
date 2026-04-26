@@ -83,6 +83,7 @@ export async function PATCH(
     memoryPrompt,
     memoryHistory,
     lastSummarizeIndex,
+    updatedAt,
   } = await req.json();
 
   const rows = await sql`
@@ -112,7 +113,13 @@ export async function PATCH(
       )}::jsonb, memory_history),
       last_summarize_index = COALESCE(${lastSummarizeIndex}, last_summarize_index),
       updated_at = NOW()
-    WHERE id = ${params.id} AND user_id = ${user.id}
+    WHERE
+      id = ${params.id}
+      AND user_id = ${user.id}
+      AND (
+        ${updatedAt ?? 0} = 0
+        OR updated_at <= to_timestamp(${updatedAt ?? 0} / 1000.0)
+      )
   `;
 
   return NextResponse.json({ ok: true });

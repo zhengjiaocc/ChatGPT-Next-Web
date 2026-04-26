@@ -247,6 +247,7 @@ type SessionSyncPayload = {
   memoryPrompt: string;
   memoryHistory: MemoryHistoryEntry[];
   lastSummarizeIndex: number;
+  updatedAt: number;
 };
 
 const SESSION_SYNC_DEBOUNCE_MS = 500;
@@ -276,6 +277,7 @@ function buildSessionSyncPayload(
     memoryPrompt: session.memoryPrompt,
     memoryHistory: session.memoryHistory ?? [],
     lastSummarizeIndex: session.lastSummarizeIndex,
+    updatedAt: session.lastUpdate || Date.now(),
   };
 }
 
@@ -1356,6 +1358,7 @@ export const useChatStore = createPersistStore(
                       createdAt: Date.now(),
                     },
                   ];
+                  session.lastUpdate = Date.now();
                 });
               }
             },
