@@ -285,7 +285,7 @@ export function Home() {
 
         // Logged-in mode uses cloud as source of truth.
         useChatStore.getState().clearSessions();
-        useProviderStore.setState({ providers: [] });
+        useProviderStore.setState({ providers: [], providersLoaded: false });
         useAppConfig.getState().reset();
 
         const providerStart = performance.now();

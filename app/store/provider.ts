@@ -85,6 +85,7 @@ export const PROVIDER_PRESETS: Record<
 
 const DEFAULT_PROVIDER_STATE = {
   providers: [] as ProviderInstance[],
+  providersLoaded: false,
 };
 
 export const useProviderStore = createPersistStore(
@@ -154,16 +155,26 @@ export const useProviderStore = createPersistStore(
     },
 
     async loadFromDB() {
-      if (!isLoggedIn()) return;
+      if (!isLoggedIn()) {
+        set({ providers: [], providersLoaded: true });
+        return;
+      }
+      set({ providersLoaded: false });
       const res = await fetch("/api/providers");
       if (res.status === 401) {
         useUserStore.getState().logout();
-        set({ providers: [] });
+        set({ providers: [], providersLoaded: true });
         return;
       }
-      if (!res.ok) return;
+      if (!res.ok) {
+        set({ providersLoaded: true });
+        return;
+      }
       const rows = await res.json();
-      if (!Array.isArray(rows) || rows.length === 0) return;
+      if (!Array.isArray(rows) || rows.length === 0) {
+        set({ providers: [], providersLoaded: true });
+        return;
+      }
       const providers: ProviderInstance[] = rows.map((r: any) => ({
         id: r.id,
         type: r.type as ServiceProvider,
@@ -174,7 +185,7 @@ export const useProviderStore = createPersistStore(
         enabled: r.enabled,
         supportsDiscovery: true,
       }));
-      set({ providers });
+      set({ providers, providersLoaded: true });
     },
   }),
   {

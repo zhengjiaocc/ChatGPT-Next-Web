@@ -2538,6 +2538,7 @@ export function Chat() {
   const navigate = useNavigate();
   const providerStore = useProviderStore();
   const hasEnabledProvider = providerStore.providers.some((p) => p.enabled);
+  const providersReady = providerStore.providersLoaded;
 
   if (chatStore.dbLoadState === "error") {
     return (
@@ -2565,7 +2566,7 @@ export function Chat() {
   }
 
   // 未配置任何供应商时，显示引导页，避免用户陷入"空对话"困境
-  if (chatStore.dbLoaded && !hasEnabledProvider) {
+  if (chatStore.dbLoaded && providersReady && !hasEnabledProvider) {
     return (
       <div
         style={{
