@@ -512,13 +512,19 @@ async function syncSessionMessagesToDB(
   messages: ChatMessage[],
 ) {
   if (!isLoggedIn()) return;
-  const persistable = messages.filter(
-    (m) =>
-      !!m?.id &&
-      !m.streaming &&
-      !m.isError &&
-      getMessageTextContent(m).trim().length > 0,
-  );
+  const persistable = messages
+    .filter(
+      (m) =>
+        !!m?.id &&
+        !m.streaming &&
+        !m.isError &&
+        getMessageTextContent(m).trim().length > 0,
+    )
+    .map((m) => {
+      const { contextInfo: _contextInfo, tools: _tools, ...rest } = m;
+      // contextInfo/tools are debug/ephemeral UI data; exclude from cloud sync to avoid oversized payloads (413)
+      return rest;
+    });
   if (persistable.length === 0) return;
   const body = JSON.stringify({
     title: session.topic,
