@@ -51,5 +51,12 @@ export async function executeRequest(
   client: Client,
   request: McpRequestMessage,
 ) {
-  return client.request(request, z.any());
+  // Newer MCP SDK versions can trigger excessive generic instantiation
+  // when inferring request/response types from dynamic schemas.
+  // Use a narrowed runtime contract here to keep build-time typing stable.
+  const requestFn = (client as any).request.bind(client) as (
+    req: McpRequestMessage,
+    schema: z.ZodTypeAny,
+  ) => Promise<unknown>;
+  return requestFn(request, z.any());
 }
