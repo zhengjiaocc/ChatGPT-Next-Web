@@ -2,9 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import sql from "../../../lib/db";
 import { verifyTurnstile } from "../../../lib/turnstile";
+import { consumeRateLimit, getRequestIp } from "../../../lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const { username, password, turnstileToken } = await req.json();
+  const normalizedUsername =
+    typeof username === "string" ? username.trim().toLowerCase() : "";
+  const ip = getRequestIp(req);
+  const limit = await consumeRateLimit({
+    key: `register:${ip}:${normalizedUsername || "unknown"}`,
+    limit: 5,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "请求过于频繁，请稍后再试" },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(Math.ceil(limit.retryAfterMs / 1000)),
+        },
+      },
+    );
+  }
 
   if (!(await verifyTurnstile(turnstileToken ?? ""))) {
     return NextResponse.json({ error: "人机验证失败" }, { status: 400 });

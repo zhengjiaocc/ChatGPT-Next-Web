@@ -27,14 +27,31 @@ export async function POST(req: NextRequest) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { id, type, label, api_key, base_url, models, enabled } =
-    await req.json();
-  const encryptedKey = await encrypt(api_key ?? "");
-  await sql`
+  const body = await req.json();
+  const id =
+    typeof body?.id === "string" && body.id.trim()
+      ? body.id.trim()
+      : crypto.randomUUID();
+  const type = typeof body?.type === "string" ? body.type.trim() : "";
+  const label = typeof body?.label === "string" ? body.label.trim() : "";
+  const apiKey = typeof body?.api_key === "string" ? body.api_key : "";
+  const baseUrl = typeof body?.base_url === "string" ? body.base_url : "";
+  const models = Array.isArray(body?.models) ? body.models : [];
+  const enabled = body?.enabled !== false;
+
+  if (!type) {
+    return NextResponse.json(
+      { error: "Invalid provider type" },
+      { status: 400 },
+    );
+  }
+
+  const encryptedKey = await encrypt(apiKey);
+  const result = await sql`
     INSERT INTO provider_configs (id, user_id, type, label, api_key, base_url, models, enabled)
     VALUES (${id}, ${
       user.id
-    }, ${type}, ${label}, ${encryptedKey}, ${base_url}, ${JSON.stringify(
+    }, ${type}, ${label}, ${encryptedKey}, ${baseUrl}, ${JSON.stringify(
       models,
     )}, ${enabled})
     ON CONFLICT (id) DO UPDATE SET
@@ -44,8 +61,16 @@ export async function POST(req: NextRequest) {
       models = EXCLUDED.models,
       enabled = EXCLUDED.enabled,
       updated_at = NOW()
+    WHERE provider_configs.user_id = ${user.id}
+    RETURNING id
   `;
-  return NextResponse.json({ ok: true });
+  if (!result.length) {
+    return NextResponse.json(
+      { error: "Forbidden: provider does not belong to current user" },
+      { status: 403 },
+    );
+  }
+  return NextResponse.json({ ok: true, id: result[0].id });
 }
 
 export async function DELETE(req: NextRequest) {
