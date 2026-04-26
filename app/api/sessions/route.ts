@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
       jsonb_array_length(messages) AS message_count,
       messages->-1->>'id' AS last_message_id
     FROM chat_sessions
-    WHERE user_id = ${user.id} ORDER BY updated_at DESC
+    WHERE user_id = ${user.id}
+    ORDER BY updated_at DESC, id DESC
     LIMIT 50
   `;
   return NextResponse.json(sessions);

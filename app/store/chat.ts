@@ -363,7 +363,11 @@ function sanitizeSessions(sessions: ChatSession[]): ChatSession[] {
 
   const normalized = Array.from(byId.values())
     .filter(isMeaningfulSession)
-    .sort((a, b) => (b.lastUpdate || 0) - (a.lastUpdate || 0));
+    .sort((a, b) => {
+      const byTime = (b.lastUpdate || 0) - (a.lastUpdate || 0);
+      if (byTime !== 0) return byTime;
+      return b.id.localeCompare(a.id);
+    });
 
   return normalized.length > 0 ? normalized : [createEmptySession()];
 }
@@ -1492,12 +1496,15 @@ export const useChatStore = createPersistStore(
             });
             return;
           }
+          const isEmptyDefaultSession = (r: any) =>
+            r?.title === DEFAULT_TOPIC && (r?.message_count ?? 0) <= 0;
           const filteredRows = rows.filter(
-            (r: any) => r.title !== DEFAULT_TOPIC,
+            (r: any) => !isEmptyDefaultSession(r),
           );
-          // Clean up untitled empty sessions from DB
+          // Only clean up truly empty default sessions.
+          // Keep default-titled sessions when they already contain messages.
           rows
-            .filter((r: any) => !filteredRows.includes(r))
+            .filter((r: any) => isEmptyDefaultSession(r))
             .forEach((r: any) => deleteSessionFromDB(r.id));
           if (!filteredRows.length) {
             set({
