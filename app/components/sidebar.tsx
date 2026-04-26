@@ -46,8 +46,8 @@ import { isMcpEnabled } from "../mcp/actions";
 /** dynamic 拉取 chat-list chunk 时的占位，避免短暂空白 */
 function ChatListChunkPlaceholder() {
   return (
-    <div className={styles["chat-list"]}>
-      {Array.from({ length: 5 }).map((_, i) => (
+    <div className={styles["chat-list"]} style={{ overflow: "hidden" }}>
+      {Array.from({ length: 12 }).map((_, i) => (
         <div key={i} className={styles["chat-item"]}>
           <div className={styles["chat-item-title"]}>
             <span

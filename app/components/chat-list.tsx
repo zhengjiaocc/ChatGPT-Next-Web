@@ -15,7 +15,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Path } from "../constant";
 import { MaskAvatar } from "./mask";
 import { Mask } from "../store/mask";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useLayoutEffect, useState } from "react";
 import { showConfirm } from "./ui-lib";
 import { useMobileScreen } from "../utils";
 import clsx from "clsx";
@@ -115,9 +115,11 @@ export function ChatList(props: { narrow?: boolean }) {
   const navigate = useNavigate();
   const isMobileScreen = useMobileScreen();
   const listRef = useRef<HTMLDivElement>(null);
-  const [containerHeight, setContainerHeight] = useState(400);
+  const [containerHeight, setContainerHeight] = useState(0);
 
-  useEffect(() => {
+  // Use layout effect so first paint already uses real height,
+  // avoiding skeleton count jump that can cause scrollbar flash.
+  useLayoutEffect(() => {
     const el = listRef.current?.parentElement;
     if (!el) return;
     setContainerHeight(el.clientHeight);
