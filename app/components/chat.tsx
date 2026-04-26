@@ -234,6 +234,7 @@ function MemoryHistoryItem(props: {
   defaultOpen: boolean;
 }) {
   const [open, setOpen] = useState(props.defaultOpen);
+  const isMobileScreen = useMobileScreen();
   const { entry, index, isLatest } = props;
   return (
     <div style={{ borderBottom: "var(--border-in-light) 1px solid" }}>
@@ -243,17 +244,35 @@ function MemoryHistoryItem(props: {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "10px 20px",
+          padding: isMobileScreen ? "8px 12px" : "10px 20px",
           cursor: "pointer",
           userSelect: "none",
           background: open ? "var(--hover-color)" : undefined,
+          gap: 8,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: isMobileScreen ? 6 : 8,
+            minWidth: 0,
+            flex: 1,
+          }}
+        >
           <span style={{ fontSize: 14, fontWeight: 500 }}>
             第 {index} 次压缩
           </span>
-          <span style={{ fontSize: 12, opacity: 0.45 }}>
+          <span
+            style={{
+              fontSize: 12,
+              opacity: 0.45,
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
             {entry.isUpdate ? "合并更新" : "首次"} · 消息 {entry.fromIndex}–
             {entry.toIndex}
           </span>
@@ -268,16 +287,19 @@ function MemoryHistoryItem(props: {
             gap: 8,
             fontSize: 11,
             opacity: 0.4,
+            flexShrink: 0,
           }}
         >
-          {entry.createdAt > 0 && new Date(entry.createdAt).toLocaleString()}
+          {!isMobileScreen &&
+            entry.createdAt > 0 &&
+            new Date(entry.createdAt).toLocaleString()}
           <span>{open ? "▲" : "▼"}</span>
         </div>
       </div>
       {open && (
         <div
           style={{
-            padding: "8px 20px 16px",
+            padding: isMobileScreen ? "8px 12px 12px" : "8px 20px 16px",
             fontSize: 13,
             lineHeight: 1.6,
             borderTop: "var(--border-in-light) 1px solid",
