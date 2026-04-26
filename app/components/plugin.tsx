@@ -58,7 +58,7 @@ export function PluginPage() {
   const closePluginModal = () => setEditingPluginId(undefined);
 
   const onChangePlugin = useDebouncedCallback((editingPlugin, e) => {
-    const content = e.target.innerText;
+    const content = e.currentTarget.textContent ?? "";
     try {
       const api = new OpenAPIClientAxios({
         definition: yaml.load(content) as any,
@@ -345,11 +345,11 @@ export function PluginPage() {
                     <pre>
                       <code
                         contentEditable={true}
-                        dangerouslySetInnerHTML={{
-                          __html: editingPlugin.content,
-                        }}
+                        suppressContentEditableWarning
                         onBlur={onChangePlugin}
-                      ></code>
+                      >
+                        {editingPlugin.content}
+                      </code>
                     </pre>
                   </div>
                 }
