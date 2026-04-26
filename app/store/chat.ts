@@ -254,6 +254,7 @@ const SESSION_SYNC_DEBOUNCE_MS = 500;
 const sessionSyncTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingSessionSyncPayload = new Map<string, SessionSyncPayload>();
 const sessionSyncRunning = new Map<string, boolean>();
+const lastSyncedMessageIdBySession = new Map<string, string>();
 export const summarizingSessionIds = new Set<string>();
 let syncFlushEventsInstalled = false;
 
@@ -262,6 +263,7 @@ function clearAllSessionSyncTasks() {
   sessionSyncTimers.clear();
   pendingSessionSyncPayload.clear();
   sessionSyncRunning.clear();
+  lastSyncedMessageIdBySession.clear();
 }
 
 function buildSessionSyncPayload(
@@ -520,11 +522,27 @@ async function syncSessionMessagesToDB(
       getMessageTextContent(m).trim().length > 0,
   );
   if (persistable.length === 0) return;
+  const lastSyncedId = lastSyncedMessageIdBySession.get(session.id);
+  let appendOnly = persistable;
+  let syncMode: "append" | "replace" = "append";
+  if (lastSyncedId) {
+    const idx = persistable.findIndex((m) => m.id === lastSyncedId);
+    if (idx >= 0) {
+      appendOnly = persistable.slice(idx + 1);
+    } else {
+      // Local history diverged from cloud baseline (e.g. resend/trim/reset).
+      // Fall back to replace mode so server can realign with local truth.
+      syncMode = "replace";
+      appendOnly = persistable;
+    }
+  }
+  if (appendOnly.length === 0) return;
   const body = JSON.stringify({
     title: session.topic,
-    messages: persistable,
+    messages: appendOnly,
     model: session.mask.modelConfig.model,
     mask: session.mask,
+    mode: syncMode,
   });
   const payloadBytes =
     typeof TextEncoder !== "undefined"
@@ -543,16 +561,24 @@ async function syncSessionMessagesToDB(
       console.log(
         "[Sync] POST messages",
         session.id,
-        persistable.length,
+        appendOnly.length,
+        `mode=${syncMode}`,
         `bytes=${payloadBytes}`,
         `attempt=${attempt + 1}`,
         `status=${res.status}`,
       );
-      if (res.ok) return;
+      if (res.ok) {
+        const latestId = persistable[persistable.length - 1]?.id;
+        if (latestId) {
+          lastSyncedMessageIdBySession.set(session.id, latestId);
+        }
+        return;
+      }
       const errText = await res.text().catch(() => "");
       console.warn(
         "[Sync] POST messages non-OK",
         session.id,
+        `mode=${syncMode}`,
         `bytes=${payloadBytes}`,
         `attempt=${attempt + 1}`,
         `status=${res.status}`,
@@ -563,6 +589,7 @@ async function syncSessionMessagesToDB(
         console.error(
           "[Sync] POST messages failed after 3 attempts",
           session.id,
+          `mode=${syncMode}`,
           `bytes=${payloadBytes}`,
           e,
         );
@@ -570,6 +597,7 @@ async function syncSessionMessagesToDB(
         console.warn(
           "[Sync] POST messages retry",
           session.id,
+          `mode=${syncMode}`,
           `bytes=${payloadBytes}`,
           `attempt=${attempt + 1}`,
           e,
@@ -587,6 +615,7 @@ async function deleteSessionFromDB(id: string) {
   sessionSyncTimers.delete(id);
   pendingSessionSyncPayload.delete(id);
   sessionSyncRunning.delete(id);
+  lastSyncedMessageIdBySession.delete(id);
   const body = JSON.stringify({ id });
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -1544,6 +1573,7 @@ export const useChatStore = createPersistStore(
             return;
           }
           const hidden = new Set<string>(get().hiddenSessionIds ?? []);
+          lastSyncedMessageIdBySession.clear();
           const providers = useProviderStore.getState().providers;
           const localSessionMap = new Map(localSessions.map((s) => [s.id, s]));
           const cloudSessions: ChatSession[] = filteredRows
@@ -1604,6 +1634,10 @@ export const useChatStore = createPersistStore(
                 lastSummarizeIndex: r.last_summarize_index ?? 0,
                 lastUpdate: cloudUpdatedAt,
               };
+              const knownLastId = session.messages.at(-1)?.id;
+              if (knownLastId) {
+                lastSyncedMessageIdBySession.set(session.id, knownLastId);
+              }
               // Auto-fill providerId if missing
               if (!session.mask.modelConfig.providerId) {
                 const { model, providerName } = session.mask.modelConfig;
@@ -1700,6 +1734,12 @@ export const useChatStore = createPersistStore(
             };
             return { sessions: updated };
           });
+          const syncedTail = (
+            localAhead ? get().sessions[index]?.messages : nextMessages
+          ).at(-1)?.id;
+          if (syncedTail) {
+            lastSyncedMessageIdBySession.set(sessionId, syncedTail);
+          }
           // If local was ahead, push local messages to cloud immediately
           if (localAhead) {
             const finalSession = get().sessions.find((s) => s.id === sessionId);
