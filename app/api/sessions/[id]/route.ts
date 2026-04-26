@@ -91,15 +91,9 @@ export async function PATCH(
   `;
 
   if (!rows.length) {
-    await sql`
-      INSERT INTO chat_sessions (id, user_id, title, model, mask, memory_prompt, memory_history, last_summarize_index)
-      VALUES (
-        ${params.id}, ${user.id}, ${title ?? "新的聊天"}, ${model ?? ""},
-        ${JSON.stringify(mask ?? {})}, ${memoryPrompt ?? ""},
-        ${JSON.stringify(memoryHistory ?? [])}, ${lastSummarizeIndex ?? 0}
-      )
-    `;
-    return NextResponse.json({ ok: true, created: true });
+    // Do NOT create sessions via PATCH.
+    // This prevents deleted sessions from being resurrected by delayed/stale PATCH requests.
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   await sql`

@@ -509,11 +509,21 @@ async function deleteSessionFromDB(id: string) {
   sessionSyncTimers.delete(id);
   pendingSessionSyncPayload.delete(id);
   sessionSyncRunning.delete(id);
-  await fetch("/api/sessions", {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id }),
-  });
+  const body = JSON.stringify({ id });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetchWithTimeout("/api/sessions", {
+        method: "DELETE",
+        keepalive: true,
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      if (res.ok) return;
+    } catch (e) {
+      if (attempt === 2) console.error("[Sync] failed to delete session", e);
+      else await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+    }
+  }
 }
 
 const DEFAULT_CHAT_STATE = {
