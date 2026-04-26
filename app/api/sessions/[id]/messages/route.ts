@@ -13,36 +13,77 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const { title, messages, model, mask } = await req.json();
+    const { title, messages, model, mask, mode } = await req.json();
     const msgs = Array.isArray(messages) ? messages : [];
+    const syncMode: "replace" | "append" =
+      mode === "append" ? "append" : "replace";
 
     console.log(
       "[Sessions][messages] upsert start",
       `session=${params.id}`,
       `user=${user.id}`,
       `count=${msgs.length}`,
+      `mode=${syncMode}`,
     );
 
-    await sql`
-      INSERT INTO chat_sessions (id, user_id, title, messages, model, mask)
-      VALUES (
-        ${params.id}, ${user.id}, ${title ?? "新的聊天"},
-        ${JSON.stringify(msgs)}::jsonb,
-        ${model ?? ""}, ${JSON.stringify(mask ?? {})}::jsonb
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        title = EXCLUDED.title,
-        messages = CASE WHEN jsonb_array_length(EXCLUDED.messages) > 0 THEN EXCLUDED.messages ELSE chat_sessions.messages END,
-        model = EXCLUDED.model,
-        mask = EXCLUDED.mask,
-        updated_at = NOW()
-      WHERE chat_sessions.user_id = ${user.id}
-    `;
+    if (syncMode === "append") {
+      await sql`
+        INSERT INTO chat_sessions (id, user_id, title, messages, model, mask)
+        VALUES (
+          ${params.id}, ${user.id}, ${title ?? "新的聊天"},
+          ${JSON.stringify(msgs)}::jsonb,
+          ${model ?? ""}, ${JSON.stringify(mask ?? {})}::jsonb
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          messages = (
+            SELECT COALESCE(jsonb_agg(msg ORDER BY ord), '[]'::jsonb)
+            FROM (
+              SELECT DISTINCT ON (msg_id) msg_id, msg, ord
+              FROM (
+                SELECT
+                  COALESCE(old_msg->>'id', md5(old_msg::text)) AS msg_id,
+                  old_msg AS msg,
+                  old_ord::bigint AS ord
+                FROM jsonb_array_elements(chat_sessions.messages) WITH ORDINALITY AS old_t(old_msg, old_ord)
+                UNION ALL
+                SELECT
+                  COALESCE(new_msg->>'id', md5(new_msg::text)) AS msg_id,
+                  new_msg AS msg,
+                  (1000000000 + new_ord)::bigint AS ord
+                FROM jsonb_array_elements(EXCLUDED.messages) WITH ORDINALITY AS new_t(new_msg, new_ord)
+              ) merged
+              ORDER BY msg_id, ord DESC
+            ) dedup
+          ),
+          model = EXCLUDED.model,
+          mask = EXCLUDED.mask,
+          updated_at = NOW()
+        WHERE chat_sessions.user_id = ${user.id}
+      `;
+    } else {
+      await sql`
+        INSERT INTO chat_sessions (id, user_id, title, messages, model, mask)
+        VALUES (
+          ${params.id}, ${user.id}, ${title ?? "新的聊天"},
+          ${JSON.stringify(msgs)}::jsonb,
+          ${model ?? ""}, ${JSON.stringify(mask ?? {})}::jsonb
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          messages = CASE WHEN jsonb_array_length(EXCLUDED.messages) > 0 THEN EXCLUDED.messages ELSE chat_sessions.messages END,
+          model = EXCLUDED.model,
+          mask = EXCLUDED.mask,
+          updated_at = NOW()
+        WHERE chat_sessions.user_id = ${user.id}
+      `;
+    }
 
     console.log(
       "[Sessions][messages] upsert ok",
       `session=${params.id}`,
       `count=${msgs.length}`,
+      `mode=${syncMode}`,
     );
     return NextResponse.json({ ok: true });
   } catch (error) {

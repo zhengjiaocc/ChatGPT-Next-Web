@@ -512,74 +512,146 @@ async function syncSessionMessagesToDB(
   messages: ChatMessage[],
 ) {
   if (!isLoggedIn()) return;
-  const persistable = messages
-    .filter(
-      (m) =>
-        !!m?.id &&
-        !m.streaming &&
-        !m.isError &&
-        getMessageTextContent(m).trim().length > 0,
-    )
-    .map((m) => {
-      const { contextInfo: _contextInfo, tools: _tools, ...rest } = m;
-      // contextInfo/tools are debug/ephemeral UI data; exclude from cloud sync to avoid oversized payloads (413)
-      return rest;
-    });
+  const persistable = messages.filter(
+    (m) =>
+      !!m?.id &&
+      !m.streaming &&
+      !m.isError &&
+      getMessageTextContent(m).trim().length > 0,
+  );
   if (persistable.length === 0) return;
-  const body = JSON.stringify({
+
+  const chunkByBytes = (arr: ChatMessage[], maxBytes: number) => {
+    const chunks: ChatMessage[][] = [];
+    let current: ChatMessage[] = [];
+    let currentBytes = 0;
+    for (const msg of arr) {
+      const single = JSON.stringify([msg]);
+      const msgBytes =
+        typeof TextEncoder !== "undefined"
+          ? new TextEncoder().encode(single).length
+          : single.length;
+      if (current.length > 0 && currentBytes + msgBytes > maxBytes) {
+        chunks.push(current);
+        current = [];
+        currentBytes = 0;
+      }
+      current.push(msg);
+      currentBytes += msgBytes;
+    }
+    if (current.length > 0) chunks.push(current);
+    return chunks;
+  };
+
+  const postOnce = async (
+    part: ChatMessage[],
+    mode: "replace" | "append",
+    attempt: number,
+  ) => {
+    const body = JSON.stringify({
+      title: session.topic,
+      messages: part,
+      model: session.mask.modelConfig.model,
+      mask: session.mask,
+      mode,
+    });
+    const payloadBytes =
+      typeof TextEncoder !== "undefined"
+        ? new TextEncoder().encode(body).length
+        : body.length;
+    const res = await fetchWithTimeout(`/api/sessions/${session.id}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    console.log(
+      "[Sync] POST messages",
+      session.id,
+      part.length,
+      `mode=${mode}`,
+      `bytes=${payloadBytes}`,
+      `attempt=${attempt + 1}`,
+      `status=${res.status}`,
+    );
+    return { res, payloadBytes };
+  };
+
+  const sendInChunks = async () => {
+    const chunks = chunkByBytes(persistable, 450_000);
+    for (let i = 0; i < chunks.length; i++) {
+      const mode: "replace" | "append" = i === 0 ? "replace" : "append";
+      let ok = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const { res, payloadBytes } = await postOnce(
+            chunks[i],
+            mode,
+            attempt,
+          );
+          if (res.ok) {
+            ok = true;
+            break;
+          }
+          const errText = await res.text().catch(() => "");
+          console.warn(
+            "[Sync] POST messages chunk non-OK",
+            session.id,
+            `chunk=${i + 1}/${chunks.length}`,
+            `mode=${mode}`,
+            `bytes=${payloadBytes}`,
+            `status=${res.status}`,
+            errText.slice(0, 300),
+          );
+        } catch (e) {
+          if (attempt === 2) throw e;
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        }
+      }
+      if (!ok) return false;
+    }
+    return true;
+  };
+
+  const fullBody = JSON.stringify({
     title: session.topic,
     messages: persistable,
     model: session.mask.modelConfig.model,
     mask: session.mask,
+    mode: "replace",
   });
-  const payloadBytes =
+  const fullBytes =
     typeof TextEncoder !== "undefined"
-      ? new TextEncoder().encode(body).length
-      : body.length;
+      ? new TextEncoder().encode(fullBody).length
+      : fullBody.length;
+
+  // Fast path for normal payloads, fallback to chunked upload on 413.
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetchWithTimeout(
-        `/api/sessions/${session.id}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body,
-        },
-      );
-      console.log(
-        "[Sync] POST messages",
-        session.id,
-        persistable.length,
-        `bytes=${payloadBytes}`,
-        `attempt=${attempt + 1}`,
-        `status=${res.status}`,
-      );
+      const { res } = await postOnce(persistable, "replace", attempt);
       if (res.ok) return;
-      const errText = await res.text().catch(() => "");
-      console.warn(
-        "[Sync] POST messages non-OK",
-        session.id,
-        `bytes=${payloadBytes}`,
-        `attempt=${attempt + 1}`,
-        `status=${res.status}`,
-        errText.slice(0, 300),
-      );
+      if (res.status === 413) {
+        const chunkedOk = await sendInChunks();
+        if (chunkedOk) return;
+      } else {
+        const errText = await res.text().catch(() => "");
+        console.warn(
+          "[Sync] POST messages non-OK",
+          session.id,
+          `bytes=${fullBytes}`,
+          `attempt=${attempt + 1}`,
+          `status=${res.status}`,
+          errText.slice(0, 300),
+        );
+      }
     } catch (e) {
       if (attempt === 2) {
         console.error(
           "[Sync] POST messages failed after 3 attempts",
           session.id,
-          `bytes=${payloadBytes}`,
+          `bytes=${fullBytes}`,
           e,
         );
       } else {
-        console.warn(
-          "[Sync] POST messages retry",
-          session.id,
-          `bytes=${payloadBytes}`,
-          `attempt=${attempt + 1}`,
-          e,
-        );
         await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
       }
     }
