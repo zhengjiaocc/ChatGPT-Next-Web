@@ -1258,10 +1258,23 @@ export const useChatStore = createPersistStore(
         const historyMsgLength = countMessages(toBeSummarizedMsgs);
 
         if (historyMsgLength > (modelConfig?.max_tokens || 4000)) {
-          const n = toBeSummarizedMsgs.length;
-          const slicedStartOffset = Math.max(0, n - 20);
-          toBeSummarizedMsgs = toBeSummarizedMsgs.slice(slicedStartOffset);
-          effectiveSummarizeIndex = summarizeIndex + slicedStartOffset;
+          // Dynamically keep the longest contiguous prefix from summarizeIndex
+          // that fits the model token budget, so summarized ranges stay continuous.
+          const maxTokenBudget = modelConfig?.max_tokens || 4000;
+          let tokenCount = 0;
+          let keepCount = 0;
+          for (let i = 0; i < toBeSummarizedMsgs.length; i += 1) {
+            const msg = toBeSummarizedMsgs[i];
+            const nextToken = estimateTokenLength(getMessageTextContent(msg));
+            if (keepCount > 0 && tokenCount + nextToken > maxTokenBudget) break;
+            tokenCount += nextToken;
+            keepCount += 1;
+          }
+          toBeSummarizedMsgs = toBeSummarizedMsgs.slice(
+            0,
+            Math.max(1, keepCount),
+          );
+          effectiveSummarizeIndex = summarizeIndex;
         }
         const memoryPrompt = get().getMemoryPrompt();
         const hasExistingMemory = !!memoryPrompt;

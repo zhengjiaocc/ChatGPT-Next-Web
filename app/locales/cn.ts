@@ -293,8 +293,9 @@ const cn = {
       SubTitle: "每次请求携带的历史消息条数（每轮对话 = 用户+助手共 2 条）",
     },
     CompressThreshold: {
-      Title: "触发长期记忆的 Token 阈值",
-      SubTitle: "历史消息累计超过此 Token 数时，自动压缩为长期记忆摘要",
+      Title: "长期记忆触发阈值（Token）",
+      SubTitle:
+        "仅决定何时开始压缩；达到阈值后，每次压缩范围会按模型 Token 上限动态计算，并按历史区间连续推进",
     },
 
     Usage: {
