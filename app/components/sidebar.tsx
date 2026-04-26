@@ -314,6 +314,7 @@ export function SideBar(props: { className?: string }) {
   const providerStore = useProviderStore();
   // ChatList 在 db 未就绪时会显示骨架；不要等 dbLoaded 再挂载，否则加载阶段侧边栏整块空白。
   const hasEnabledProvider = providerStore.providers.some((p) => p.enabled);
+  const providersReady = providerStore.providersLoaded;
   const [mcpEnabled, setMcpEnabled] = useState(false);
 
   useEffect(() => {
@@ -383,7 +384,9 @@ export function SideBar(props: { className?: string }) {
           }
         }}
       >
-        {hasEnabledProvider && <ChatList narrow={shouldNarrow} />}
+        {(hasEnabledProvider || !providersReady) && (
+          <ChatList narrow={shouldNarrow} />
+        )}
       </SideBarBody>
       <SideBarTail
         primaryAction={

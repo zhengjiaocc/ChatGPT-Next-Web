@@ -2,7 +2,7 @@
 
 require("../polyfill");
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import styles from "./home.module.scss";
 
 import BotIcon from "../icons/bot.svg";
@@ -271,7 +271,7 @@ export function Home() {
     initMcp();
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false;
 
     const loadUserData = async () => {
@@ -284,6 +284,7 @@ export function Home() {
         }
 
         // Logged-in mode uses cloud as source of truth.
+        useChatStore.setState({ dbLoaded: false, dbLoadState: "loading" });
         useChatStore.getState().clearSessions();
         useProviderStore.setState({ providers: [], providersLoaded: false });
         useAppConfig.getState().reset();
