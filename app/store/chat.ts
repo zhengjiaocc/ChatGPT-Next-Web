@@ -526,13 +526,16 @@ async function syncSessionMessagesToDB(
     model: session.mask.modelConfig.model,
     mask: session.mask,
   });
+  const payloadBytes =
+    typeof TextEncoder !== "undefined"
+      ? new TextEncoder().encode(body).length
+      : body.length;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetchWithTimeout(
         `/api/sessions/${session.id}/messages`,
         {
           method: "POST",
-          keepalive: true,
           headers: { "Content-Type": "application/json" },
           body,
         },
@@ -541,12 +544,38 @@ async function syncSessionMessagesToDB(
         "[Sync] POST messages",
         session.id,
         persistable.length,
-        res.status,
+        `bytes=${payloadBytes}`,
+        `attempt=${attempt + 1}`,
+        `status=${res.status}`,
       );
       if (res.ok) return;
+      const errText = await res.text().catch(() => "");
+      console.warn(
+        "[Sync] POST messages non-OK",
+        session.id,
+        `bytes=${payloadBytes}`,
+        `attempt=${attempt + 1}`,
+        `status=${res.status}`,
+        errText.slice(0, 300),
+      );
     } catch (e) {
-      if (attempt === 2) console.error("[Sync] failed after 3 attempts", e);
-      else await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      if (attempt === 2) {
+        console.error(
+          "[Sync] POST messages failed after 3 attempts",
+          session.id,
+          `bytes=${payloadBytes}`,
+          e,
+        );
+      } else {
+        console.warn(
+          "[Sync] POST messages retry",
+          session.id,
+          `bytes=${payloadBytes}`,
+          `attempt=${attempt + 1}`,
+          e,
+        );
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      }
     }
   }
 }
@@ -1544,6 +1573,22 @@ export const useChatStore = createPersistStore(
                   : true);
               const shouldReuseLocalMessages =
                 localIsAhead || localMatchesCloud;
+              const baseMask = createEmptyMask();
+              const rawMask = (r.mask ?? {}) as Partial<Mask>;
+              const normalizedMask: Mask = {
+                ...baseMask,
+                ...rawMask,
+                context: Array.isArray(rawMask.context)
+                  ? rawMask.context
+                  : baseMask.context,
+                plugin: Array.isArray(rawMask.plugin)
+                  ? rawMask.plugin
+                  : baseMask.plugin,
+                modelConfig: {
+                  ...baseMask.modelConfig,
+                  ...(rawMask.modelConfig ?? {}),
+                },
+              };
               const session = {
                 ...createEmptySession(),
                 id: r.id,
@@ -1553,7 +1598,7 @@ export const useChatStore = createPersistStore(
                 messageCount: localIsAhead
                   ? localMessages.length
                   : cloudMessageCount,
-                mask: r.mask ?? createEmptyMask(),
+                mask: normalizedMask,
                 memoryPrompt: r.memory_prompt ?? "",
                 memoryHistory: r.memory_history ?? [],
                 lastSummarizeIndex: r.last_summarize_index ?? 0,

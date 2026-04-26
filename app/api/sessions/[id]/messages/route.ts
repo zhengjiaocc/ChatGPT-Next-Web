@@ -12,24 +12,48 @@ export async function POST(
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { title, messages, model, mask } = await req.json();
-  const msgs = Array.isArray(messages) ? messages : [];
+  try {
+    const { title, messages, model, mask } = await req.json();
+    const msgs = Array.isArray(messages) ? messages : [];
 
-  await sql`
-    INSERT INTO chat_sessions (id, user_id, title, messages, model, mask)
-    VALUES (
-      ${params.id}, ${user.id}, ${title ?? "新的聊天"},
-      ${JSON.stringify(msgs)}::jsonb,
-      ${model ?? ""}, ${JSON.stringify(mask ?? {})}::jsonb
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      title = EXCLUDED.title,
-      messages = CASE WHEN jsonb_array_length(EXCLUDED.messages) > 0 THEN EXCLUDED.messages ELSE chat_sessions.messages END,
-      model = EXCLUDED.model,
-      mask = EXCLUDED.mask,
-      updated_at = NOW()
-    WHERE chat_sessions.user_id = ${user.id}
-  `;
+    console.log(
+      "[Sessions][messages] upsert start",
+      `session=${params.id}`,
+      `user=${user.id}`,
+      `count=${msgs.length}`,
+    );
 
-  return NextResponse.json({ ok: true });
+    await sql`
+      INSERT INTO chat_sessions (id, user_id, title, messages, model, mask)
+      VALUES (
+        ${params.id}, ${user.id}, ${title ?? "新的聊天"},
+        ${JSON.stringify(msgs)}::jsonb,
+        ${model ?? ""}, ${JSON.stringify(mask ?? {})}::jsonb
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        title = EXCLUDED.title,
+        messages = CASE WHEN jsonb_array_length(EXCLUDED.messages) > 0 THEN EXCLUDED.messages ELSE chat_sessions.messages END,
+        model = EXCLUDED.model,
+        mask = EXCLUDED.mask,
+        updated_at = NOW()
+      WHERE chat_sessions.user_id = ${user.id}
+    `;
+
+    console.log(
+      "[Sessions][messages] upsert ok",
+      `session=${params.id}`,
+      `count=${msgs.length}`,
+    );
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error(
+      "[Sessions][messages] upsert failed",
+      `session=${params.id}`,
+      error,
+    );
+    return NextResponse.json(
+      { error: "Failed to persist messages" },
+      { status: 500 },
+    );
+  }
 }
