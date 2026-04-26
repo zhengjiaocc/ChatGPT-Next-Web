@@ -477,9 +477,6 @@ async function syncSessionMessagesToDB(
     messages: persistable,
     model: session.mask.modelConfig.model,
     mask: session.mask,
-    memoryPrompt: session.memoryPrompt,
-    memoryHistory: session.memoryHistory ?? [],
-    lastSummarizeIndex: session.lastSummarizeIndex,
   });
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
