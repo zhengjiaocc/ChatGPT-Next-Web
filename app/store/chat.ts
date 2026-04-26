@@ -374,15 +374,33 @@ async function syncSessionPayloadToDB(
 ) {
   for (let i = 0; i < retries; i++) {
     try {
-      const res = await fetchWithTimeout(
-        `/api/sessions/${encodeURIComponent(payload.id)}`,
+      const metaRes = await fetchWithTimeout(
+        `/api/sessions/${encodeURIComponent(payload.id)}/meta`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            title: payload.title,
+            model: payload.model,
+            mask: payload.mask,
+            updatedAt: payload.updatedAt,
+          }),
         },
       );
-      if (res.ok) return true;
+      const memRes = await fetchWithTimeout(
+        `/api/sessions/${encodeURIComponent(payload.id)}/memory`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            memoryPrompt: payload.memoryPrompt,
+            memoryHistory: payload.memoryHistory,
+            lastSummarizeIndex: payload.lastSummarizeIndex,
+            updatedAt: payload.updatedAt,
+          }),
+        },
+      );
+      if (metaRes.ok && memRes.ok) return true;
     } catch (e) {
       if (i === retries - 1) console.error("[Sync] failed to sync session", e);
     }
@@ -394,13 +412,37 @@ function trySendBeaconSync(payload: SessionSyncPayload) {
   if (typeof navigator === "undefined") return false;
   if (typeof navigator.sendBeacon !== "function") return false;
   try {
-    const blob = new Blob([JSON.stringify(payload)], {
-      type: "application/json",
-    });
-    return navigator.sendBeacon(
-      `/api/sessions/${encodeURIComponent(payload.id)}`,
-      blob,
+    const metaBlob = new Blob(
+      [
+        JSON.stringify({
+          title: payload.title,
+          model: payload.model,
+          mask: payload.mask,
+          updatedAt: payload.updatedAt,
+        }),
+      ],
+      { type: "application/json" },
     );
+    const memBlob = new Blob(
+      [
+        JSON.stringify({
+          memoryPrompt: payload.memoryPrompt,
+          memoryHistory: payload.memoryHistory,
+          lastSummarizeIndex: payload.lastSummarizeIndex,
+          updatedAt: payload.updatedAt,
+        }),
+      ],
+      { type: "application/json" },
+    );
+    const ok1 = navigator.sendBeacon(
+      `/api/sessions/${encodeURIComponent(payload.id)}/meta`,
+      metaBlob,
+    );
+    const ok2 = navigator.sendBeacon(
+      `/api/sessions/${encodeURIComponent(payload.id)}/memory`,
+      memBlob,
+    );
+    return ok1 && ok2;
   } catch {
     return false;
   }
@@ -482,12 +524,15 @@ async function syncSessionMessagesToDB(
   });
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetchWithTimeout(`/api/sessions/${session.id}`, {
-        method: "POST",
-        keepalive: true,
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
+      const res = await fetchWithTimeout(
+        `/api/sessions/${session.id}/messages`,
+        {
+          method: "POST",
+          keepalive: true,
+          headers: { "Content-Type": "application/json" },
+          body,
+        },
+      );
       console.log(
         "[Sync] POST messages",
         session.id,
@@ -512,12 +557,15 @@ async function deleteSessionFromDB(id: string) {
   const body = JSON.stringify({ id });
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetchWithTimeout("/api/sessions", {
-        method: "DELETE",
-        keepalive: true,
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
+      const res = await fetchWithTimeout(
+        `/api/sessions/${encodeURIComponent(id)}`,
+        {
+          method: "DELETE",
+          keepalive: true,
+          headers: { "Content-Type": "application/json" },
+          body,
+        },
+      );
       if (res.ok) return;
     } catch (e) {
       if (attempt === 2) console.error("[Sync] failed to delete session", e);

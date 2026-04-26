@@ -118,3 +118,15 @@ export async function PATCH(
 
   return NextResponse.json({ ok: true });
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const user = await getUser(req);
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await sql`DELETE FROM chat_sessions WHERE id = ${params.id} AND user_id = ${user.id}`;
+  return NextResponse.json({ ok: true });
+}
