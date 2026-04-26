@@ -85,6 +85,9 @@ export async function PATCH(
     lastSummarizeIndex,
     updatedAt,
   } = await req.json();
+  const updatedAtMs = Number.isFinite(Number(updatedAt))
+    ? Math.max(0, Math.floor(Number(updatedAt)))
+    : 0;
 
   const rows = await sql`
     SELECT id FROM chat_sessions WHERE id = ${params.id} AND user_id = ${user.id} LIMIT 1
@@ -111,8 +114,8 @@ export async function PATCH(
       id = ${params.id}
       AND user_id = ${user.id}
       AND (
-        ${updatedAt ?? 0} = 0
-        OR updated_at <= to_timestamp(${updatedAt ?? 0} / 1000.0)
+        ${updatedAtMs}::bigint = 0
+        OR (extract(epoch from updated_at) * 1000)::bigint <= ${updatedAtMs}::bigint
       )
   `;
 

@@ -17,46 +17,63 @@ import { handle as chatglmHandler } from "../../glm";
 import { handle as proxyHandler } from "../../proxy";
 import { handle as ai302Handler } from "../../302ai";
 
+function isAbortLikeError(error: unknown) {
+  if (!error) return false;
+  if (typeof error === "object") {
+    const maybeError = error as { name?: string; message?: string };
+    if (maybeError.name === "AbortError") return true;
+    if (maybeError.message?.toLowerCase().includes("aborted")) return true;
+  }
+  return false;
+}
+
 async function handle(
   req: NextRequest,
   { params }: { params: { provider: string; path: string[] } },
 ) {
   const apiPath = `/api/${params.provider}`;
   console.log(`[${params.provider} Route] params `, params);
-  switch (apiPath) {
-    case ApiPath.Azure:
-      return azureHandler(req, { params });
-    case ApiPath.Google:
-      return googleHandler(req, { params });
-    case ApiPath.Anthropic:
-      return anthropicHandler(req, { params });
-    case ApiPath.Baidu:
-      return baiduHandler(req, { params });
-    case ApiPath.ByteDance:
-      return bytedanceHandler(req, { params });
-    case ApiPath.Alibaba:
-      return alibabaHandler(req, { params });
-    // case ApiPath.Tencent: using "/api/tencent"
-    case ApiPath.Moonshot:
-      return moonshotHandler(req, { params });
-    case ApiPath.Stability:
-      return stabilityHandler(req, { params });
-    case ApiPath.Iflytek:
-      return iflytekHandler(req, { params });
-    case ApiPath.DeepSeek:
-      return deepseekHandler(req, { params });
-    case ApiPath.XAI:
-      return xaiHandler(req, { params });
-    case ApiPath.ChatGLM:
-      return chatglmHandler(req, { params });
-    case ApiPath.SiliconFlow:
-      return siliconflowHandler(req, { params });
-    case ApiPath.OpenAI:
-      return openaiHandler(req, { params });
-    case ApiPath["302.AI"]:
-      return ai302Handler(req, { params });
-    default:
-      return proxyHandler(req, { params });
+  try {
+    switch (apiPath) {
+      case ApiPath.Azure:
+        return azureHandler(req, { params });
+      case ApiPath.Google:
+        return googleHandler(req, { params });
+      case ApiPath.Anthropic:
+        return anthropicHandler(req, { params });
+      case ApiPath.Baidu:
+        return baiduHandler(req, { params });
+      case ApiPath.ByteDance:
+        return bytedanceHandler(req, { params });
+      case ApiPath.Alibaba:
+        return alibabaHandler(req, { params });
+      // case ApiPath.Tencent: using "/api/tencent"
+      case ApiPath.Moonshot:
+        return moonshotHandler(req, { params });
+      case ApiPath.Stability:
+        return stabilityHandler(req, { params });
+      case ApiPath.Iflytek:
+        return iflytekHandler(req, { params });
+      case ApiPath.DeepSeek:
+        return deepseekHandler(req, { params });
+      case ApiPath.XAI:
+        return xaiHandler(req, { params });
+      case ApiPath.ChatGLM:
+        return chatglmHandler(req, { params });
+      case ApiPath.SiliconFlow:
+        return siliconflowHandler(req, { params });
+      case ApiPath.OpenAI:
+        return openaiHandler(req, { params });
+      case ApiPath["302.AI"]:
+        return ai302Handler(req, { params });
+      default:
+        return proxyHandler(req, { params });
+    }
+  } catch (error) {
+    if (isAbortLikeError(error)) {
+      return new Response(null, { status: 204 });
+    }
+    throw error;
   }
 }
 
