@@ -122,6 +122,21 @@
   svg { width: 18px; height: 18px; }
 }
 
+.rememberRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -2px 0 8px;
+  font-size: 13px;
+  color: var(--black);
+  opacity: 0.75;
+  user-select: none;
+
+  input {
+    cursor: pointer;
+  }
+}
+
 .error {
   color: var(--error);
   font-size: 13px;

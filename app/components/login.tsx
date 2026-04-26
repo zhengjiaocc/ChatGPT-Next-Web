@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { Path } from "../constant";
@@ -11,6 +11,7 @@ import { useUserStore } from "../store/user";
 import styles from "./login.module.scss";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+const REMEMBER_KEY = "nonechat:remember-login";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -22,8 +23,23 @@ export function LoginPage() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
+  const [rememberPassword, setRememberPassword] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileRef = useRef<any>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(REMEMBER_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        username?: string;
+        password?: string;
+      };
+      if (typeof saved.username === "string") setUsername(saved.username);
+      if (typeof saved.password === "string") setPassword(saved.password);
+      if (saved.username || saved.password) setRememberPassword(true);
+    } catch {}
+  }, []);
 
   const submit = async () => {
     if (loading) return;
@@ -75,6 +91,21 @@ export function LoginPage() {
       turnstileRef.current?.reset();
       return;
     }
+    if (rememberPassword) {
+      try {
+        localStorage.setItem(
+          REMEMBER_KEY,
+          JSON.stringify({
+            username: username.trim(),
+            password,
+          }),
+        );
+      } catch {}
+    } else {
+      try {
+        localStorage.removeItem(REMEMBER_KEY);
+      } catch {}
+    }
     userStore.login(data.id, data.username);
     navigate(Path.Chat);
   };
@@ -99,6 +130,7 @@ export function LoginPage() {
           type="text"
           placeholder="用户名"
           value={username}
+          autoComplete="username"
           onChange={(e) => setUsername(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
         />
@@ -109,6 +141,9 @@ export function LoginPage() {
             type={showPwd ? "text" : "password"}
             placeholder="密码"
             value={password}
+            autoComplete={
+              mode === "login" ? "current-password" : "new-password"
+            }
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && submit()}
           />
@@ -116,6 +151,24 @@ export function LoginPage() {
             {showPwd ? <EyeIcon /> : <EyeOffIcon />}
           </span>
         </div>
+        {mode === "login" && (
+          <label className={styles.rememberRow}>
+            <input
+              type="checkbox"
+              checked={rememberPassword}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                setRememberPassword(checked);
+                if (!checked) {
+                  try {
+                    localStorage.removeItem(REMEMBER_KEY);
+                  } catch {}
+                }
+              }}
+            />
+            <span>记住密码</span>
+          </label>
+        )}
 
         {mode === "register" && password.length > 0 && (
           <div className={styles.pwdHints}>
