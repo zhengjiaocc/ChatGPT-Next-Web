@@ -1381,13 +1381,18 @@ function _Chat() {
       return;
     }
 
-    const beforeMessages = session.messages.slice(0, userMessageIndex);
     chatStore.updateTargetSession(session, (s) => {
-      s.messages = beforeMessages;
+      // Re-find the index inside the updater so we operate on the live store
+      // state, not the stale component snapshot. This prevents messages added
+      // after the last render (e.g. during streaming) from being silently
+      // dropped when the truncated slice is written back.
+      const liveIndex = s.messages.findIndex((m) => m.id === userMessage!.id);
+      const cutIndex = liveIndex >= 0 ? liveIndex : userMessageIndex;
+      s.messages = s.messages.slice(0, cutIndex);
       // Discard summaries that cover messages beyond the truncation point
-      if (s.lastSummarizeIndex > userMessageIndex) {
+      if (s.lastSummarizeIndex > cutIndex) {
         const validHistory = (s.memoryHistory ?? []).filter(
-          (h) => h.toIndex <= userMessageIndex,
+          (h) => h.toIndex <= cutIndex,
         );
         s.memoryHistory = validHistory;
         const lastValid = validHistory[validHistory.length - 1];
