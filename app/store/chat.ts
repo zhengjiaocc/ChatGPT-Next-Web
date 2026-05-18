@@ -507,55 +507,65 @@ async function syncSessionToDB(session: ChatSession) {
   );
 }
 
+// Incremental upsert: only send messages that are ready to persist.
+// seq = index-in-array * 1000, matching the migration backfill convention.
+// Each call is idempotent — safe to retry and safe to call with overlapping
+// subsets of the message list.
 async function syncSessionMessagesToDB(
   session: ChatSession,
   messages: ChatMessage[],
 ) {
   if (!isLoggedIn()) return;
-  const persistable = messages.filter(
-    (m) =>
-      !!m?.id &&
-      !m.streaming &&
-      !m.isError &&
-      getMessageTextContent(m).trim().length > 0,
-  );
+
+  // Build the persistable list with seq values derived from position.
+  const persistable: { id: string; seq: number; payload: ChatMessage }[] = [];
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    if (
+      !m?.id ||
+      m.streaming ||
+      m.isError ||
+      getMessageTextContent(m).trim().length === 0
+    )
+      continue;
+    persistable.push({ id: m.id, seq: i * 1000, payload: m });
+  }
   if (persistable.length === 0) return;
 
-  const chunkByBytes = (arr: ChatMessage[], maxBytes: number) => {
-    const chunks: ChatMessage[][] = [];
-    let current: ChatMessage[] = [];
+  // Split into chunks of ~450 KB to stay well under Vercel's 4.5 MB limit.
+  const chunkByBytes = (
+    arr: typeof persistable,
+    maxBytes: number,
+  ): (typeof persistable)[] => {
+    const chunks: (typeof persistable)[] = [];
+    let current: typeof persistable = [];
     let currentBytes = 0;
-    for (const msg of arr) {
-      const single = JSON.stringify([msg]);
-      const msgBytes =
+    for (const item of arr) {
+      const s = JSON.stringify(item);
+      const b =
         typeof TextEncoder !== "undefined"
-          ? new TextEncoder().encode(single).length
-          : single.length;
-      if (current.length > 0 && currentBytes + msgBytes > maxBytes) {
+          ? new TextEncoder().encode(s).length
+          : s.length;
+      if (current.length > 0 && currentBytes + b > maxBytes) {
         chunks.push(current);
         current = [];
         currentBytes = 0;
       }
-      current.push(msg);
-      currentBytes += msgBytes;
+      current.push(item);
+      currentBytes += b;
     }
     if (current.length > 0) chunks.push(current);
     return chunks;
   };
 
-  const postOnce = async (
-    part: ChatMessage[],
-    mode: "replace" | "append",
-    attempt: number,
-  ) => {
+  const postChunk = async (chunk: typeof persistable, attempt: number) => {
     const body = JSON.stringify({
       title: session.topic,
-      messages: part,
       model: session.mask.modelConfig.model,
       mask: session.mask,
-      mode,
+      messages: chunk,
     });
-    const payloadBytes =
+    const bytes =
       typeof TextEncoder !== "undefined"
         ? new TextEncoder().encode(body).length
         : body.length;
@@ -565,95 +575,65 @@ async function syncSessionMessagesToDB(
       body,
     });
     console.log(
-      "[Sync] POST messages",
+      "[Sync] upsert messages",
       session.id,
-      part.length,
-      `mode=${mode}`,
-      `bytes=${payloadBytes}`,
+      `count=${chunk.length}`,
+      `bytes=${bytes}`,
       `attempt=${attempt + 1}`,
       `status=${res.status}`,
     );
-    return { res, payloadBytes };
+    return res;
   };
 
-  const sendInChunks = async () => {
-    const chunks = chunkByBytes(persistable, 450_000);
-    for (let i = 0; i < chunks.length; i++) {
-      const mode: "replace" | "append" = i === 0 ? "replace" : "append";
-      let ok = false;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const { res, payloadBytes } = await postOnce(
-            chunks[i],
-            mode,
-            attempt,
-          );
-          if (res.ok) {
-            ok = true;
-            break;
-          }
-          const errText = await res.text().catch(() => "");
-          console.warn(
-            "[Sync] POST messages chunk non-OK",
-            session.id,
-            `chunk=${i + 1}/${chunks.length}`,
-            `mode=${mode}`,
-            `bytes=${payloadBytes}`,
-            `status=${res.status}`,
-            errText.slice(0, 300),
-          );
-        } catch (e) {
-          if (attempt === 2) throw e;
-          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+  const chunks = chunkByBytes(persistable, 450_000);
+  for (const chunk of chunks) {
+    let ok = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await postChunk(chunk, attempt);
+        if (res.ok) {
+          ok = true;
+          break;
         }
-      }
-      if (!ok) return false;
-    }
-    return true;
-  };
-
-  const fullBody = JSON.stringify({
-    title: session.topic,
-    messages: persistable,
-    model: session.mask.modelConfig.model,
-    mask: session.mask,
-    mode: "replace",
-  });
-  const fullBytes =
-    typeof TextEncoder !== "undefined"
-      ? new TextEncoder().encode(fullBody).length
-      : fullBody.length;
-
-  // Fast path for normal payloads, fallback to chunked upload on 413.
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const { res } = await postOnce(persistable, "replace", attempt);
-      if (res.ok) return;
-      if (res.status === 413) {
-        const chunkedOk = await sendInChunks();
-        if (chunkedOk) return;
-      } else {
         const errText = await res.text().catch(() => "");
         console.warn(
-          "[Sync] POST messages non-OK",
+          "[Sync] upsert messages non-OK",
           session.id,
-          `bytes=${fullBytes}`,
-          `attempt=${attempt + 1}`,
           `status=${res.status}`,
           errText.slice(0, 300),
         );
+      } catch (e) {
+        if (attempt === 2)
+          console.error("[Sync] upsert messages failed", session.id, e);
+        else await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
       }
+    }
+    if (!ok) return; // abort remaining chunks on persistent failure
+  }
+}
+
+// Truncate server-side messages with seq >= afterSeq.
+// Called after onResend cuts the local message list.
+async function truncateServerMessagesAfterSeq(
+  sessionId: string,
+  afterSeq: number,
+) {
+  if (!isLoggedIn()) return;
+  const url = `/api/sessions/${sessionId}/messages?afterSeq=${afterSeq}`;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetchWithTimeout(url, { method: "DELETE" });
+      if (res.ok) return;
+      console.warn(
+        "[Sync] truncate messages non-OK",
+        sessionId,
+        `afterSeq=${afterSeq}`,
+        `status=${res.status}`,
+      );
     } catch (e) {
-      if (attempt === 2) {
-        console.error(
-          "[Sync] POST messages failed after 3 attempts",
-          session.id,
-          `bytes=${fullBytes}`,
-          e,
-        );
-      } else {
-        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-      }
+      if (attempt === 2)
+        console.error("[Sync] truncate messages failed", sessionId, e);
+      else await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
     }
   }
 }
@@ -1123,7 +1103,9 @@ export const useChatStore = createPersistStore(
             ChatControllerPool.remove(session.id, botMessage.id);
             const latestSession =
               get().sessions.find((s) => s.id === session.id) ?? session;
-            // full sync so resend/truncate is reflected on server
+            // Upsert the complete message list (user + bot) now that streaming
+            // is done.  The incremental upsert is idempotent, so this is safe
+            // even if the user message was already written earlier.
             void syncSessionMessagesToDB(latestSession, latestSession.messages);
             // sync ASAP so other devices can see new messages quickly
             void flushSessionSyncQueue(session.id);
@@ -1562,6 +1544,10 @@ export const useChatStore = createPersistStore(
         updater(sessions[index]);
         set(() => ({ sessions }));
         if (!skipSync) syncSessionToDB(sessions[index]);
+      },
+
+      truncateServerMessages(sessionId: string, afterSeq: number) {
+        return truncateServerMessagesAfterSeq(sessionId, afterSeq);
       },
       async clearAllData() {
         clearAllSessionSyncTasks();

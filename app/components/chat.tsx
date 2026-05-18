@@ -1381,6 +1381,17 @@ function _Chat() {
       return;
     }
 
+    // Compute the live cut index from the store (not the stale component
+    // snapshot) so the server truncation seq matches the local truncation.
+    const liveSession = chatStore.currentSession();
+    const liveCutIndex = (() => {
+      const idx = liveSession.messages.findIndex(
+        (m) => m.id === userMessage!.id,
+      );
+      return idx >= 0 ? idx : userMessageIndex;
+    })();
+    const truncateAfterSeq = liveCutIndex * 1000;
+
     chatStore.updateTargetSession(session, (s) => {
       // Re-find the index inside the updater so we operate on the live store
       // state, not the stale component snapshot. This prevents messages added
@@ -1400,6 +1411,9 @@ function _Chat() {
         s.lastSummarizeIndex = lastValid?.toIndex ?? 0;
       }
     });
+
+    // Mirror the truncation on the server so other devices see the cut.
+    void chatStore.truncateServerMessages(session.id, truncateAfterSeq);
     setIsLoading(true);
     const textContent = getMessageTextContent(userMessage);
     const images = getMessageImages(userMessage);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "../../lib/auth";
 import sql from "../../lib/db";
+import { runMigrations } from "../../lib/migrate";
 
 export const runtime = "edge";
 
@@ -9,13 +10,26 @@ export async function GET(req: NextRequest) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  await runMigrations();
+
   const sessions = await sql`
-    SELECT id, title, model, mask, memory_prompt, memory_history, last_summarize_index, updated_at,
-      jsonb_array_length(messages) AS message_count,
-      messages->-1->>'id' AS last_message_id
-    FROM chat_sessions
-    WHERE user_id = ${user.id}
-    ORDER BY updated_at DESC, id DESC
+    SELECT
+      s.id, s.title, s.model, s.mask,
+      s.memory_prompt, s.memory_history, s.last_summarize_index, s.updated_at,
+      COALESCE(m.message_count, 0)  AS message_count,
+      COALESCE(m.last_message_id, '') AS last_message_id
+    FROM chat_sessions s
+    LEFT JOIN LATERAL (
+      SELECT
+        COUNT(*)::int AS message_count,
+        (SELECT id FROM chat_messages
+         WHERE session_id = s.id AND user_id = ${user.id}
+         ORDER BY seq DESC LIMIT 1) AS last_message_id
+      FROM chat_messages
+      WHERE session_id = s.id AND user_id = ${user.id}
+    ) m ON true
+    WHERE s.user_id = ${user.id}
+    ORDER BY s.updated_at DESC, s.id DESC
     LIMIT 50
   `;
   return NextResponse.json(sessions);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "../../../lib/auth";
 import sql from "../../../lib/db";
+import { runMigrations } from "../../../lib/migrate";
 
 export const runtime = "edge";
 
@@ -12,29 +13,50 @@ export async function GET(
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  await runMigrations();
+
   const metaOnly = req.nextUrl.searchParams.get("meta") === "1";
-  const rows = await sql`
-    SELECT id, title, model, messages, mask, memory_prompt, last_summarize_index, updated_at,
-      jsonb_array_length(messages) AS message_count,
-      messages->-1->>'id' AS last_message_id
+
+  const sessionRows = await sql`
+    SELECT id, title, model, mask, memory_prompt, memory_history,
+           last_summarize_index, updated_at
     FROM chat_sessions
     WHERE id = ${params.id} AND user_id = ${user.id}
     LIMIT 1
   `;
-  if (!rows.length)
+  if (!sessionRows.length)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const session = sessionRows[0] as any;
+
+  // Count and last id come from the new messages table.
+  const countRows = await sql`
+    SELECT COUNT(*)::int AS message_count,
+           MAX(id) FILTER (WHERE seq = (SELECT MAX(seq) FROM chat_messages WHERE session_id = ${params.id})) AS last_message_id
+    FROM chat_messages
+    WHERE session_id = ${params.id} AND user_id = ${user.id}
+  `;
+  const { message_count, last_message_id } = (countRows[0] as any) ?? {};
+
   if (metaOnly) {
-    const r = rows[0] as any;
     return NextResponse.json({
-      id: r.id,
-      updated_at: r.updated_at,
-      message_count: r.message_count ?? 0,
-      last_message_id: r.last_message_id ?? "",
+      id: session.id,
+      updated_at: session.updated_at,
+      message_count: message_count ?? 0,
+      last_message_id: last_message_id ?? "",
     });
   }
 
-  return NextResponse.json(rows[0]);
+  // Full load: read messages from the dedicated table, ordered by seq.
+  const msgRows = await sql`
+    SELECT payload
+    FROM chat_messages
+    WHERE session_id = ${params.id} AND user_id = ${user.id}
+    ORDER BY seq ASC
+  `;
+  const messages = msgRows.map((r: any) => r.payload);
+
+  return NextResponse.json({ ...session, messages });
 }
 
 export async function POST(
