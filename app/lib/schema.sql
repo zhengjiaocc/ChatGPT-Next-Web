@@ -37,5 +37,22 @@ CREATE TABLE IF NOT EXISTS app_configs (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS chat_messages (
+  session_id  TEXT        NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+  id          TEXT        NOT NULL,
+  user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  payload     JSONB       NOT NULL,
+  seq         BIGINT      NOT NULL,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (session_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  name       TEXT        PRIMARY KEY,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id ON chat_sessions(user_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_provider_configs_user_id ON provider_configs(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_session_seq ON chat_messages(session_id, seq);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON chat_messages(user_id);
