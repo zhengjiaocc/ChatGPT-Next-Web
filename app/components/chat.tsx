@@ -2185,19 +2185,38 @@ function _Chat() {
                                                       >
                                                         携带的历史对话：
                                                         {(
-                                                          msgContextInfo.historyMessages ??
+                                                          msgContextInfo.historyMessageIds ??
                                                           []
                                                         ).length ||
                                                           msgContextInfo.sentCount}{" "}
                                                         条
                                                       </summary>
                                                       {(
-                                                        msgContextInfo.historyMessages ??
+                                                        msgContextInfo.historyMessageIds ??
                                                         []
                                                       ).length > 0 ? (
                                                         [
-                                                          ...(msgContextInfo.historyMessages ??
-                                                            []),
+                                                          ...(
+                                                            msgContextInfo.historyMessageIds ??
+                                                            []
+                                                          )
+                                                            .map((id) => {
+                                                              const m =
+                                                                session.messages.find(
+                                                                  (m) =>
+                                                                    m.id === id,
+                                                                );
+                                                              if (!m)
+                                                                return null;
+                                                              return {
+                                                                role: m.role,
+                                                                content:
+                                                                  getMessageTextContent(
+                                                                    m,
+                                                                  ),
+                                                              };
+                                                            })
+                                                            .filter(Boolean),
                                                           {
                                                             role: message.role,
                                                             content:

@@ -89,10 +89,7 @@ export type ChatMessage = RequestMessage & {
     contextPromptsCount: number;
     hasLongTermMemory: boolean;
     memoryPrompt?: string;
-    historyMessages?: Array<{
-      role: string;
-      content: string;
-    }>;
+    historyMessageIds?: string[];
   };
 };
 
@@ -1023,7 +1020,7 @@ export const useChatStore = createPersistStore(
           contextPromptsCount: ctx.contextPromptsCount,
           hasLongTermMemory: ctx.hasLongTermMemory,
           memoryPrompt: ctx.memoryPrompt,
-          historyMessages: ctx.sentHistoryMessages ?? [],
+          historyMessageIds: ctx.sentHistoryMessages ?? [],
         };
         const sendMessages = ctx.messages.concat(userMessage);
         const messageIndex = session.messages.length + 2;
@@ -1258,17 +1255,14 @@ export const useChatStore = createPersistStore(
           ...contextPrompts,
           ...reversedRecentMessages.reverse(),
         ];
-        const sentHistoryMessages = reversedRecentMessages
-          .map((m) => ({
-            role: m.role,
-            content: getMessageTextContent(m),
-          }))
-          .filter((m) => m.content.trim().length > 0);
+        const sentHistoryMessageIds = reversedRecentMessages
+          .filter((m) => !!m.id && getMessageTextContent(m).trim().length > 0)
+          .map((m) => m.id);
 
         return {
           messages: recentMessages,
-          sentHistoryCount: sentHistoryMessages.length,
-          sentHistoryMessages,
+          sentHistoryCount: sentHistoryMessageIds.length,
+          sentHistoryMessages: sentHistoryMessageIds,
           contextPromptsCount: contextPrompts.length,
           hasLongTermMemory: shouldSendLongTermMemory,
           memoryPrompt: shouldSendLongTermMemory ? session.memoryPrompt : "",
