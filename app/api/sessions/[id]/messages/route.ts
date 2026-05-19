@@ -5,8 +5,12 @@ import { runMigrations } from "../../../../lib/migrate";
 
 export const runtime = "edge";
 
-// POST  – upsert a batch of messages (idempotent, incremental)
-// DELETE – truncate messages with seq >= a given value (used by resend)
+// POST – upsert a batch of messages (idempotent, incremental).
+//
+// Optional body field `truncateAfterMessageId`: if provided, the server
+// atomically deletes all messages with seq >= the seq of that message
+// before upserting the new batch.  This makes resend a single round-trip
+// with no race condition between a separate DELETE and POST.
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -18,14 +22,13 @@ export async function POST(
   try {
     await runMigrations();
 
-    const { messages, title, model, mask } = await req.json();
+    const { messages, title, model, mask, truncateAfterMessageId } =
+      await req.json();
     const msgs: {
       id: string;
       seq: number;
       payload: Record<string, unknown>;
     }[] = Array.isArray(messages) ? messages : [];
-
-    if (msgs.length === 0) return NextResponse.json({ ok: true, upserted: 0 });
 
     // Ensure the session row exists before inserting messages (FK constraint).
     await sql`
@@ -42,9 +45,28 @@ export async function POST(
       WHERE chat_sessions.user_id = ${user.id}
     `;
 
-    // Upsert each message row.  On conflict we update payload + seq so that
-    // edits to an existing message are reflected.
-    // We batch via unnest to keep the round-trip count to 1.
+    // Atomic truncate: delete messages with seq >= the anchor message's seq.
+    // This runs before the upsert so the new messages land cleanly.
+    if (truncateAfterMessageId) {
+      await sql`
+        DELETE FROM chat_messages
+        WHERE session_id = ${params.id}
+          AND user_id    = ${user.id}
+          AND seq >= (
+            SELECT seq FROM chat_messages
+            WHERE session_id = ${params.id}
+              AND user_id    = ${user.id}
+              AND id         = ${truncateAfterMessageId}
+            LIMIT 1
+          )
+      `;
+    }
+
+    if (msgs.length === 0) {
+      await sql`UPDATE chat_sessions SET updated_at = NOW() WHERE id = ${params.id} AND user_id = ${user.id}`;
+      return NextResponse.json({ ok: true, upserted: 0 });
+    }
+
     const ids = msgs.map((m) => m.id);
     const seqs = msgs.map((m) => m.seq);
     const payloads = msgs.map((m) => JSON.stringify(m.payload));
@@ -68,7 +90,6 @@ export async function POST(
         updated_at = NOW()
     `;
 
-    // Keep chat_sessions.updated_at fresh so the session list stays sorted.
     await sql`
       UPDATE chat_sessions SET updated_at = NOW()
       WHERE id = ${params.id} AND user_id = ${user.id}
@@ -78,6 +99,7 @@ export async function POST(
       "[Sessions][messages] upsert ok",
       `session=${params.id}`,
       `count=${msgs.length}`,
+      truncateAfterMessageId ? `truncateAfter=${truncateAfterMessageId}` : "",
     );
     return NextResponse.json({ ok: true, upserted: msgs.length });
   } catch (error) {
@@ -88,69 +110,6 @@ export async function POST(
     );
     return NextResponse.json(
       { error: "Failed to persist messages" },
-      { status: 500 },
-    );
-  }
-}
-
-// DELETE /api/sessions/[id]/messages?afterSeq=N
-// Removes all messages with seq >= N.  Used when the user resends a historical
-// message: the client truncates locally then calls this to mirror the cut.
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  const user = await getUser(req);
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  try {
-    await runMigrations();
-
-    const afterSeqParam = req.nextUrl.searchParams.get("afterSeq");
-    if (afterSeqParam === null)
-      return NextResponse.json({ error: "Missing afterSeq" }, { status: 400 });
-
-    const afterSeq = Number(afterSeqParam);
-    if (!Number.isFinite(afterSeq))
-      return NextResponse.json({ error: "Invalid afterSeq" }, { status: 400 });
-
-    // Verify session ownership before deleting.
-    const rows = await sql`
-      SELECT id FROM chat_sessions
-      WHERE id = ${params.id} AND user_id = ${user.id}
-      LIMIT 1
-    `;
-    if (!rows.length)
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-    const result = await sql`
-      DELETE FROM chat_messages
-      WHERE session_id = ${params.id}
-        AND user_id    = ${user.id}
-        AND seq        >= ${afterSeq}
-    `;
-
-    await sql`
-      UPDATE chat_sessions SET updated_at = NOW()
-      WHERE id = ${params.id} AND user_id = ${user.id}
-    `;
-
-    console.log(
-      "[Sessions][messages] truncate ok",
-      `session=${params.id}`,
-      `afterSeq=${afterSeq}`,
-      `deleted=${(result as any).count ?? "?"}`,
-    );
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error(
-      "[Sessions][messages] truncate failed",
-      `session=${params.id}`,
-      error,
-    );
-    return NextResponse.json(
-      { error: "Failed to truncate messages" },
       { status: 500 },
     );
   }

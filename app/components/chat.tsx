@@ -1381,26 +1381,14 @@ function _Chat() {
       return;
     }
 
-    // Compute the live cut index from the store (not the stale component
-    // snapshot) so the server truncation seq matches the local truncation.
-    const liveSession = chatStore.currentSession();
-    const liveCutIndex = (() => {
-      const idx = liveSession.messages.findIndex(
-        (m) => m.id === userMessage!.id,
-      );
-      return idx >= 0 ? idx : userMessageIndex;
-    })();
-    const truncateAfterSeq = liveCutIndex * 1000;
+    // Record the id of the user message being resent so the server can
+    // atomically truncate + upsert in a single request (no race condition).
+    const truncateAfterMessageId = userMessage.id;
 
     chatStore.updateTargetSession(session, (s) => {
-      // Re-find the index inside the updater so we operate on the live store
-      // state, not the stale component snapshot. This prevents messages added
-      // after the last render (e.g. during streaming) from being silently
-      // dropped when the truncated slice is written back.
       const liveIndex = s.messages.findIndex((m) => m.id === userMessage!.id);
       const cutIndex = liveIndex >= 0 ? liveIndex : userMessageIndex;
       s.messages = s.messages.slice(0, cutIndex);
-      // Discard summaries that cover messages beyond the truncation point
       if (s.lastSummarizeIndex > cutIndex) {
         const validHistory = (s.memoryHistory ?? []).filter(
           (h) => h.toIndex <= cutIndex,
@@ -1412,13 +1400,11 @@ function _Chat() {
       }
     });
 
-    // Mirror the truncation on the server so other devices see the cut.
-    void chatStore.truncateServerMessages(session.id, truncateAfterSeq);
     setIsLoading(true);
     const textContent = getMessageTextContent(userMessage);
     const images = getMessageImages(userMessage);
     chatStore
-      .onUserInput(textContent, images)
+      .onUserInput(textContent, images, false, truncateAfterMessageId)
       .catch((e) => {
         console.error("[Chat] failed to resend message", e);
         showToast("消息重试失败，请稍后重试");

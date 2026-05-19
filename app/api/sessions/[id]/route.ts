@@ -31,8 +31,11 @@ export async function GET(
 
   // Count and last id come from the new messages table.
   const countRows = await sql`
-    SELECT COUNT(*)::int AS message_count,
-           MAX(id) FILTER (WHERE seq = (SELECT MAX(seq) FROM chat_messages WHERE session_id = ${params.id})) AS last_message_id
+    SELECT
+      COUNT(*)::int AS message_count,
+      (SELECT id FROM chat_messages
+       WHERE session_id = ${params.id} AND user_id = ${user.id}
+       ORDER BY seq DESC LIMIT 1) AS last_message_id
     FROM chat_messages
     WHERE session_id = ${params.id} AND user_id = ${user.id}
   `;
@@ -67,22 +70,20 @@ export async function POST(
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { title, messages, model, mask } = await req.json();
+  await runMigrations();
 
-  const msgs = Array.isArray(messages) ? messages : [];
+  const { title, model, mask } = await req.json();
 
   await sql`
-    INSERT INTO chat_sessions (id, user_id, title, messages, model, mask)
+    INSERT INTO chat_sessions (id, user_id, title, model, mask)
     VALUES (
       ${params.id}, ${user.id}, ${title ?? "新的聊天"},
-      ${JSON.stringify(msgs)}::jsonb,
       ${model ?? ""}, ${JSON.stringify(mask ?? {})}::jsonb
     )
     ON CONFLICT (id) DO UPDATE SET
-      title = EXCLUDED.title,
-      messages = CASE WHEN jsonb_array_length(EXCLUDED.messages) > 0 THEN EXCLUDED.messages ELSE chat_sessions.messages END,
-      model = EXCLUDED.model,
-      mask = EXCLUDED.mask,
+      title      = EXCLUDED.title,
+      model      = EXCLUDED.model,
+      mask       = EXCLUDED.mask,
       updated_at = NOW()
     WHERE chat_sessions.user_id = ${user.id}
   `;

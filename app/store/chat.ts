@@ -508,13 +508,20 @@ async function syncSessionToDB(session: ChatSession) {
 // seq = index-in-array * 1000, matching the migration backfill convention.
 // Each call is idempotent — safe to retry and safe to call with overlapping
 // subsets of the message list.
+//
+// truncateAfterMessageId: if provided, the server atomically deletes all
+// messages with seq >= the seq of that message before upserting.  This
+// makes resend a single round-trip with no race condition.
 async function syncSessionMessagesToDB(
   session: ChatSession,
   messages: ChatMessage[],
+  truncateAfterMessageId?: string,
 ) {
   if (!isLoggedIn()) return;
 
-  // Build the persistable list with seq values derived from position.
+  // Build the persistable list. seq = position in the full messages array
+  // (including non-persistable entries) * 1000, so the ordering is stable
+  // relative to the array even when some entries are skipped.
   const persistable: { id: string; seq: number; payload: ChatMessage }[] = [];
   for (let i = 0; i < messages.length; i++) {
     const m = messages[i];
@@ -527,9 +534,13 @@ async function syncSessionMessagesToDB(
       continue;
     persistable.push({ id: m.id, seq: i * 1000, payload: m });
   }
-  if (persistable.length === 0) return;
+
+  // Even if there are no persistable messages we still need to send the
+  // truncate request when truncateAfterMessageId is set.
+  if (persistable.length === 0 && !truncateAfterMessageId) return;
 
   // Split into chunks of ~450 KB to stay well under Vercel's 4.5 MB limit.
+  // The truncateAfterMessageId is only sent with the first chunk.
   const chunkByBytes = (
     arr: typeof persistable,
     maxBytes: number,
@@ -555,12 +566,17 @@ async function syncSessionMessagesToDB(
     return chunks;
   };
 
-  const postChunk = async (chunk: typeof persistable, attempt: number) => {
+  const postChunk = async (
+    chunk: typeof persistable,
+    attempt: number,
+    truncateId?: string,
+  ) => {
     const body = JSON.stringify({
       title: session.topic,
       model: session.mask.modelConfig.model,
       mask: session.mask,
       messages: chunk,
+      ...(truncateId ? { truncateAfterMessageId: truncateId } : {}),
     });
     const bytes =
       typeof TextEncoder !== "undefined"
@@ -578,16 +594,21 @@ async function syncSessionMessagesToDB(
       `bytes=${bytes}`,
       `attempt=${attempt + 1}`,
       `status=${res.status}`,
+      truncateId ? `truncateAfter=${truncateId}` : "",
     );
     return res;
   };
 
-  const chunks = chunkByBytes(persistable, 450_000);
-  for (const chunk of chunks) {
+  const chunks =
+    persistable.length > 0 ? chunkByBytes(persistable, 450_000) : [[]];
+  for (let i = 0; i < chunks.length; i++) {
+    // Only attach truncateAfterMessageId to the first chunk so the delete
+    // happens exactly once before any new messages are written.
+    const truncateId = i === 0 ? truncateAfterMessageId : undefined;
     let ok = false;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const res = await postChunk(chunk, attempt);
+        const res = await postChunk(chunks[i], attempt, truncateId);
         if (res.ok) {
           ok = true;
           break;
@@ -605,33 +626,7 @@ async function syncSessionMessagesToDB(
         else await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
       }
     }
-    if (!ok) return; // abort remaining chunks on persistent failure
-  }
-}
-
-// Truncate server-side messages with seq >= afterSeq.
-// Called after onResend cuts the local message list.
-async function truncateServerMessagesAfterSeq(
-  sessionId: string,
-  afterSeq: number,
-) {
-  if (!isLoggedIn()) return;
-  const url = `/api/sessions/${sessionId}/messages?afterSeq=${afterSeq}`;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetchWithTimeout(url, { method: "DELETE" });
-      if (res.ok) return;
-      console.warn(
-        "[Sync] truncate messages non-OK",
-        sessionId,
-        `afterSeq=${afterSeq}`,
-        `status=${res.status}`,
-      );
-    } catch (e) {
-      if (attempt === 2)
-        console.error("[Sync] truncate messages failed", sessionId, e);
-      else await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
-    }
+    if (!ok) return;
   }
 }
 
@@ -970,6 +965,7 @@ export const useChatStore = createPersistStore(
         content: string,
         attachImages?: string[],
         isMcpResponse?: boolean,
+        truncateAfterMessageId?: string,
       ) {
         const session = get().currentSession();
         if (session.messagesLoaded === false) {
@@ -1037,12 +1033,14 @@ export const useChatStore = createPersistStore(
           true,
         );
         // Persist user message immediately so abrupt tab close during streaming
-        // does not lose newly sent input.
+        // does not lose newly sent input.  On resend, also atomically truncate
+        // the server-side history in the same request.
         const sessionAfterAppend =
           get().sessions.find((s) => s.id === session.id) ?? session;
         void syncSessionMessagesToDB(
           sessionAfterAppend,
           sessionAfterAppend.messages,
+          truncateAfterMessageId,
         );
 
         const matchedProvider = useProviderStore
@@ -1538,10 +1536,6 @@ export const useChatStore = createPersistStore(
         updater(sessions[index]);
         set(() => ({ sessions }));
         if (!skipSync) syncSessionToDB(sessions[index]);
-      },
-
-      truncateServerMessages(sessionId: string, afterSeq: number) {
-        return truncateServerMessagesAfterSeq(sessionId, afterSeq);
       },
       async clearAllData() {
         clearAllSessionSyncTasks();
