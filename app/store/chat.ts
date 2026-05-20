@@ -543,23 +543,14 @@ async function syncSessionMessagesToDB(
     return chunks;
   };
 
-  // Build a globalIdx map once so each message carries its 1-based position
-  // in the full persistable array. The server uses this for stable ordering
-  // across chunks (chunk-local WITH ORDINALITY positions overlap between chunks).
-  const globalIdxMap = new Map(persistable.map((m, i) => [m, i + 1]));
-
   const postOnce = async (
     part: ChatMessage[],
     mode: "replace" | "append",
     attempt: number,
   ) => {
-    const msgsWithIdx = part.map((m) => ({
-      ...m,
-      _globalIdx: globalIdxMap.get(m) ?? 0,
-    }));
     const body = JSON.stringify({
       title: session.topic,
-      messages: msgsWithIdx,
+      messages: part,
       model: session.mask.modelConfig.model,
       mask: session.mask,
       mode,
@@ -1775,12 +1766,7 @@ export const useChatStore = createPersistStore(
               current.messages.length > 0
                 ? current.messages[current.messages.length - 1]?.id ?? ""
                 : "";
-            // Local is ahead if its last message isn't in cloud, OR if cloud
-            // has fewer messages (e.g. a chunk failed mid-upload).
-            localAhead =
-              localLastId !== "" &&
-              (!cloudIds.has(localLastId) ||
-                nextMessages.length < current.messages.length);
+            localAhead = localLastId !== "" && !cloudIds.has(localLastId);
             const updated = [...state.sessions];
             updated[idx] = {
               ...current,
