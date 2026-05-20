@@ -1388,7 +1388,8 @@ function _Chat() {
       return;
     }
 
-    const userMessageId = userMessage.id;
+    const resendUser = userMessage;
+    const userMessageId = resendUser.id;
 
     cancelSessionMessageSync(session.id);
     await waitForMessageSyncComplete(session.id);
@@ -1418,8 +1419,9 @@ function _Chat() {
       await waitForMessageSyncComplete(session.id);
 
       const latestUser = truncated.messages.find((m) => m.id === userMessageId);
-      const textContent = getMessageTextContent(latestUser ?? userMessage);
-      const images = getMessageImages(latestUser ?? userMessage);
+      const sourceUser = latestUser ?? resendUser;
+      const textContent = getMessageTextContent(sourceUser);
+      const images = getMessageImages(sourceUser);
 
       setIsLoading(true);
       try {
