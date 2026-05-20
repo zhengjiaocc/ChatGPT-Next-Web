@@ -578,14 +578,35 @@ async function syncSessionMessagesToDB(
 
   const sendInChunks = async () => {
     const chunks = chunkByBytes(persistable, 450_000);
+    // First send an empty replace to clear the existing array, then append
+    // each chunk in order. This guarantees:
+    //   1. No stale messages left from a previous longer history.
+    //   2. Each append chunk lands after the previous ones (sort_ord offset
+    //      by current array length on the server side).
+    //   3. If a chunk fails, retrying it is safe — append is idempotent by id.
+    const clearRes = await fetchWithTimeout(
+      `/api/sessions/${session.id}/messages`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: session.topic,
+          messages: [],
+          model: session.mask.modelConfig.model,
+          mask: session.mask,
+          mode: "replace",
+        }),
+      },
+    );
+    if (!clearRes.ok) return false;
+
     for (let i = 0; i < chunks.length; i++) {
-      const mode: "replace" | "append" = i === 0 ? "replace" : "append";
       let ok = false;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const { res, payloadBytes } = await postOnce(
             chunks[i],
-            mode,
+            "append",
             attempt,
           );
           if (res.ok) {
@@ -597,7 +618,7 @@ async function syncSessionMessagesToDB(
             "[Sync] POST messages chunk non-OK",
             session.id,
             `chunk=${i + 1}/${chunks.length}`,
-            `mode=${mode}`,
+            `mode=append`,
             `bytes=${payloadBytes}`,
             `status=${res.status}`,
             errText.slice(0, 300),
