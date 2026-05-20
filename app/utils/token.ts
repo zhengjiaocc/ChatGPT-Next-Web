@@ -32,7 +32,7 @@ export const MODEL_CONTEXT_WINDOW: Record<string, number> = {
   "gpt-4-turbo": 128000,
   "gpt-4": 8192,
   "gpt-3.5-turbo": 16385,
-  "o1": 200000,
+  o1: 200000,
   "o1-mini": 128000,
   "o3-mini": 200000,
 
@@ -48,9 +48,11 @@ export const MODEL_CONTEXT_WINDOW: Record<string, number> = {
   "gemini-1.5-pro": 2097152,
   "gemini-1.5-flash": 1048576,
 
-  // DeepSeek
+  // DeepSeek（含供应商自定义名：deepseek-pro、deepseek-v3 等）
   "deepseek-chat": 65536,
   "deepseek-reasoner": 65536,
+  "deepseek-v3": 65536,
+  "deepseek-pro": 65536,
 
   // 保底默认值
   default: 8192,
@@ -62,15 +64,24 @@ export const MODEL_CONTEXT_WINDOW: Record<string, number> = {
  * @param modelName 模型名称
  * @param maxOutputTokens 预留给输出的 Token 数（用户配置的 max_tokens）
  */
+function resolveContextWindowSize(modelName: string): number {
+  const lower = modelName.toLowerCase();
+  // 供应商侧常见别名不在前缀表里时，按 DeepSeek 全系 64K 处理
+  if (lower.includes("deepseek")) {
+    return 65536;
+  }
+  return (
+    Object.entries(MODEL_CONTEXT_WINDOW).find(
+      ([key]) => key !== "default" && lower.startsWith(key.toLowerCase()),
+    )?.[1] ?? MODEL_CONTEXT_WINDOW.default
+  );
+}
+
 export function getAvailableContextTokens(
   modelName: string,
   maxOutputTokens: number,
 ): number {
-  // 按模型名前缀模糊匹配
-  const windowSize =
-    Object.entries(MODEL_CONTEXT_WINDOW).find(([key]) =>
-      modelName.toLowerCase().startsWith(key.toLowerCase()),
-    )?.[1] ?? MODEL_CONTEXT_WINDOW.default;
+  const windowSize = resolveContextWindowSize(modelName);
 
   // 可用输入预算 = 窗口总量 - 预留输出 Token - 500
   const available = windowSize - maxOutputTokens - 500;

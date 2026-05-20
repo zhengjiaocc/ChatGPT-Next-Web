@@ -18,6 +18,7 @@
     "prepare": "husky install",
     "proxy-dev": "sh ./scripts/init-proxy.sh && proxychains -f ./scripts/proxychains.conf yarn dev",
     "db:wipe": "node ./scripts/wipe-database.mjs",
+    "db:repair-messages": "node ./scripts/repair-session-messages.mjs",
     "test": "node --no-warnings --experimental-vm-modules $(yarn bin jest) --watch",
     "test:ci": "node --no-warnings --experimental-vm-modules $(yarn bin jest) --ci"
   },
