@@ -78,6 +78,12 @@
     width: var(--icon-width);
     overflow: hidden;
 
+    &.disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
     .text {
       white-space: nowrap;
       padding-left: 5px;

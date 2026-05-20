@@ -85,6 +85,7 @@ const en: LocaleType = {
     },
     Rename: "Rename Chat",
     Typing: "Typing…",
+    MessageSyncing: "Syncing messages to cloud, please wait",
     Input: (submitKey: string) => {
       var inputHints = `${submitKey} to send`;
       if (submitKey === String(SubmitKey.Enter)) {

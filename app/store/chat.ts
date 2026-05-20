@@ -265,9 +265,51 @@ type PendingMessageSync = {
 const pendingMessageSync = new Map<string, PendingMessageSync>();
 const messageSyncRunning = new Map<string, boolean>();
 const messageSyncGeneration = new Map<string, number>();
+const messageSyncAbortControllers = new Map<string, AbortController>();
+
+let messageSyncLockBypassDepth = 0;
+let chatStoreSet: ((partial: object) => void) | null = null;
+
+const MESSAGE_SYNC_LOCKED_TOAST = "消息同步中，请稍候再操作";
 
 export const summarizingSessionIds = new Set<string>();
 let syncFlushEventsInstalled = false;
+
+function isMessageSyncBypassed() {
+  return messageSyncLockBypassDepth > 0;
+}
+
+export function withMessageSyncBypass<T>(fn: () => T): T {
+  messageSyncLockBypassDepth += 1;
+  try {
+    return fn();
+  } finally {
+    messageSyncLockBypassDepth -= 1;
+  }
+}
+
+export async function withMessageSyncBypassAsync<T>(
+  fn: () => Promise<T>,
+): Promise<T> {
+  messageSyncLockBypassDepth += 1;
+  try {
+    return await fn();
+  } finally {
+    messageSyncLockBypassDepth -= 1;
+  }
+}
+
+function refreshMessageSyncLock(sessionId: string) {
+  if (!chatStoreSet) return;
+  const locked =
+    messageSyncRunning.get(sessionId) || pendingMessageSync.has(sessionId);
+  chatStoreSet((state: { messageSyncLocked?: Record<string, boolean> }) => {
+    const next = { ...(state.messageSyncLocked ?? {}) };
+    if (locked) next[sessionId] = true;
+    else delete next[sessionId];
+    return { messageSyncLocked: next };
+  });
+}
 
 function clearAllSessionSyncTasks() {
   sessionSyncTimers.forEach((timer) => clearTimeout(timer));
@@ -277,6 +319,8 @@ function clearAllSessionSyncTasks() {
   pendingMessageSync.clear();
   messageSyncRunning.clear();
   messageSyncGeneration.clear();
+  messageSyncAbortControllers.forEach((c) => c.abort());
+  messageSyncAbortControllers.clear();
 }
 
 /** Invalidate in-flight chunked uploads (e.g. before resend truncates history). */
@@ -285,6 +329,9 @@ export function cancelSessionMessageSync(sessionId: string) {
     sessionId,
     (messageSyncGeneration.get(sessionId) ?? 0) + 1,
   );
+  messageSyncAbortControllers.get(sessionId)?.abort();
+  messageSyncAbortControllers.delete(sessionId);
+  refreshMessageSyncLock(sessionId);
 }
 
 function isMessageSyncStale(sessionId: string, gen: number) {
@@ -302,6 +349,7 @@ export function scheduleSessionMessagesSync(
     mask: session.mask,
     messages,
   });
+  refreshMessageSyncLock(session.id);
   void flushMessageSyncQueue(session.id);
 }
 
@@ -315,18 +363,29 @@ async function flushMessageSyncQueue(sessionId: string, depth = 0) {
   pendingMessageSync.delete(sessionId);
   const gen = (messageSyncGeneration.get(sessionId) ?? 0) + 1;
   messageSyncGeneration.set(sessionId, gen);
+  const abortController = new AbortController();
+  messageSyncAbortControllers.set(sessionId, abortController);
 
   try {
     await syncSessionMessagesToDB(sessionId, pending, gen);
+  } catch (e) {
+    const aborted =
+      (e as Error)?.name === "AbortError" ||
+      (e as DOMException)?.name === "AbortError";
+    if (!aborted) throw e;
   } finally {
+    if (messageSyncAbortControllers.get(sessionId) === abortController) {
+      messageSyncAbortControllers.delete(sessionId);
+    }
     messageSyncRunning.set(sessionId, false);
+    refreshMessageSyncLock(sessionId);
     if (pendingMessageSync.has(sessionId)) {
       void flushMessageSyncQueue(sessionId, depth + 1);
     }
   }
 }
 
-async function waitForMessageSyncComplete(sessionId: string) {
+export async function waitForMessageSyncComplete(sessionId: string) {
   for (let i = 0; i < 600; i++) {
     if (
       !messageSyncRunning.get(sessionId) &&
@@ -335,6 +394,31 @@ async function waitForMessageSyncComplete(sessionId: string) {
       return;
     }
     await new Promise((r) => setTimeout(r, 50));
+  }
+}
+
+async function fetchMessageSync(
+  sessionId: string,
+  gen: number,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) {
+  if (isMessageSyncStale(sessionId, gen)) {
+    throw new DOMException("Message sync cancelled", "AbortError");
+  }
+  const external = messageSyncAbortControllers.get(sessionId)?.signal;
+  const controller = new AbortController();
+  const onExternalAbort = () => controller.abort();
+  external?.addEventListener("abort", onExternalAbort);
+  const timeoutId = setTimeout(() => controller.abort(), DB_FETCH_TIMEOUT);
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+    external?.removeEventListener("abort", onExternalAbort);
   }
 }
 
@@ -597,7 +681,33 @@ async function syncSessionMessagesToDB(
       !m.isError &&
       getMessageTextContent(m).trim().length > 0,
   );
-  if (persistable.length === 0) return;
+  if (persistable.length === 0) {
+    if (isMessageSyncStale(sessionId, gen)) return;
+    try {
+      await fetchMessageSync(
+        sessionId,
+        gen,
+        `/api/sessions/${sessionId}/messages`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: session.title,
+            messages: [],
+            model: session.model,
+            mask: session.mask,
+            mode: "replace",
+          }),
+        },
+      );
+    } catch (e) {
+      const aborted =
+        (e as Error)?.name === "AbortError" ||
+        (e as DOMException)?.name === "AbortError";
+      if (!aborted) throw e;
+    }
+    return;
+  }
 
   const chunkByBytes = (arr: ChatMessage[], maxBytes: number) => {
     const chunks: ChatMessage[][] = [];
@@ -637,11 +747,16 @@ async function syncSessionMessagesToDB(
       typeof TextEncoder !== "undefined"
         ? new TextEncoder().encode(body).length
         : body.length;
-    const res = await fetchWithTimeout(`/api/sessions/${sessionId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
+    const res = await fetchMessageSync(
+      sessionId,
+      gen,
+      `/api/sessions/${sessionId}/messages`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      },
+    );
     console.log(
       "[Sync] POST messages",
       sessionId,
@@ -664,7 +779,9 @@ async function syncSessionMessagesToDB(
     //   3. If a chunk fails, retrying it is safe — append is idempotent by id.
     if (isMessageSyncStale(sessionId, gen)) return false;
 
-    const clearRes = await fetchWithTimeout(
+    const clearRes = await fetchMessageSync(
+      sessionId,
+      gen,
       `/api/sessions/${sessionId}/messages`,
       {
         method: "POST",
@@ -705,6 +822,10 @@ async function syncSessionMessagesToDB(
             errText.slice(0, 300),
           );
         } catch (e) {
+          const aborted =
+            (e as Error)?.name === "AbortError" ||
+            (e as DOMException)?.name === "AbortError";
+          if (aborted) return false;
           if (attempt === 2) throw e;
           await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
         }
@@ -747,6 +868,10 @@ async function syncSessionMessagesToDB(
         );
       }
     } catch (e) {
+      const aborted =
+        (e as Error)?.name === "AbortError" ||
+        (e as DOMException)?.name === "AbortError";
+      if (aborted) return;
       if (attempt === 2) {
         console.error(
           "[Sync] POST messages failed after 3 attempts",
@@ -771,6 +896,8 @@ async function deleteSessionFromDB(id: string) {
   pendingMessageSync.delete(id);
   messageSyncRunning.delete(id);
   messageSyncGeneration.delete(id);
+  messageSyncAbortControllers.get(id)?.abort();
+  messageSyncAbortControllers.delete(id);
   const body = JSON.stringify({ id });
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -799,11 +926,15 @@ const DEFAULT_CHAT_STATE = {
   summarizingIds: [] as string[],
   dbLoaded: false,
   dbLoadState: "idle" as "idle" | "loading" | "ready" | "error",
+  /** 会话消息正在写入云端时为 true，UI 应禁止发送/重发/编辑等 */
+  messageSyncLocked: {} as Record<string, boolean>,
 };
 
 export const useChatStore = createPersistStore(
   DEFAULT_CHAT_STATE,
   (set, _get) => {
+    chatStoreSet = set;
+
     function get() {
       return {
         ..._get(),
@@ -812,6 +943,18 @@ export const useChatStore = createPersistStore(
     }
 
     const methods = {
+      isSessionMessageSyncLocked(sessionId?: string) {
+        const id = sessionId ?? get().currentSession()?.id;
+        if (!id) return false;
+        return !!get().messageSyncLocked[id];
+      },
+
+      ensureSessionMessageSyncUnlocked(sessionId?: string) {
+        if (isMessageSyncBypassed()) return true;
+        if (!get().isSessionMessageSyncLocked(sessionId)) return true;
+        showToast(MESSAGE_SYNC_LOCKED_TOAST);
+        return false;
+      },
       forkSession() {
         // 获取当前会话
         const currentSession = get().currentSession();
@@ -1102,6 +1245,9 @@ export const useChatStore = createPersistStore(
         isMcpResponse?: boolean,
       ) {
         const session = get().currentSession();
+        if (!get().ensureSessionMessageSyncUnlocked(session.id)) {
+          return;
+        }
         if (session.messagesLoaded === false) {
           showToast("消息加载中，请稍候...");
           return;
@@ -1277,9 +1423,16 @@ export const useChatStore = createPersistStore(
               session.id,
               botMessage.id ?? messageIndex,
             );
-            const latestSession =
-              get().sessions.find((s) => s.id === session.id) ?? session;
-            scheduleSessionMessagesSync(latestSession, latestSession.messages);
+            // Do not sync on intentional abort (resend/stop); would overwrite
+            // truncated history with the pre-truncation snapshot.
+            if (!isAborted) {
+              const latestSession =
+                get().sessions.find((s) => s.id === session.id) ?? session;
+              scheduleSessionMessagesSync(
+                latestSession,
+                latestSession.messages,
+              );
+            }
 
             console.error("[Chat] failed ", error);
           },
@@ -2019,7 +2172,8 @@ export const useChatStore = createPersistStore(
       return newState as any;
     },
     partialize: (state) => {
-      const { dbLoaded, dbLoadState, ...rest } = state as any;
+      const { dbLoaded, dbLoadState, messageSyncLocked, ...rest } =
+        state as any;
       return rest;
     },
   },

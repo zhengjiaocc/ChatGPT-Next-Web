@@ -78,6 +78,7 @@ const cn = {
     },
     Rename: "重命名对话",
     Typing: "正在输入…",
+    MessageSyncing: "消息同步中，请稍候再操作",
     Input: (submitKey: string) => {
       var inputHints = `${submitKey} 发送`;
       if (submitKey === String(SubmitKey.Enter)) {

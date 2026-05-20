@@ -56,6 +56,8 @@ import {
   useAppConfig,
   cancelSessionMessageSync,
   scheduleSessionMessagesSync,
+  waitForMessageSyncComplete,
+  withMessageSyncBypassAsync,
   useChatStore,
   usePluginStore,
 } from "../store";
@@ -489,6 +491,7 @@ export function ChatAction(props: {
   text: string;
   icon: JSX.Element;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   const iconRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -510,8 +513,12 @@ export function ChatAction(props: {
 
   return (
     <div
-      className={clsx(styles["chat-input-action"], "clickable")}
+      className={clsx(styles["chat-input-action"], {
+        clickable: !props.disabled,
+        [styles["disabled"]]: props.disabled,
+      })}
       onClick={() => {
+        if (props.disabled) return;
         props.onClick();
         setTimeout(updateWidth, 1);
       }}
@@ -1105,6 +1112,9 @@ function _Chat() {
 
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
+  const isMessageSyncLocked = session
+    ? chatStore.isSessionMessageSyncLocked(session.id)
+    : false;
 
   useEffect(() => {
     if (session?.messagesLoaded === false) {
@@ -1244,6 +1254,7 @@ function _Chat() {
 
   const doSubmit = (userInput: string) => {
     if (userInput.trim() === "" && isEmpty(attachImages)) return;
+    if (!chatStore.ensureSessionMessageSyncUnlocked(session.id)) return;
     const matchCommand = chatCommands.match(userInput);
     if (matchCommand.matched) {
       setUserInput("");
@@ -1347,11 +1358,6 @@ function _Chat() {
   };
 
   const onResend = async (message: ChatMessage) => {
-    // Ensure no in-flight stream keeps updating truncated messages.
-    // Otherwise a late onUpdate/onFinish may re-introduce "future" assistant content.
-    cancelSessionMessageSync(session.id);
-    ChatControllerPool.stopAll();
-
     const resendingIndex = session.messages.findIndex(
       (m) => m.id === message.id,
     );
@@ -1365,7 +1371,6 @@ function _Chat() {
     let userMessageIndex: number = -1;
 
     if (message.role === "assistant") {
-      // if it is resending a bot's message, find the user input for it
       for (let i = resendingIndex; i >= 0; i -= 1) {
         if (session.messages[i].role === "user") {
           userMessage = session.messages[i];
@@ -1374,7 +1379,6 @@ function _Chat() {
         }
       }
     } else if (message.role === "user") {
-      // if it is resending a user's input
       userMessage = message;
       userMessageIndex = resendingIndex;
     }
@@ -1384,35 +1388,49 @@ function _Chat() {
       return;
     }
 
-    chatStore.updateTargetSession(session, (s) => {
-      // Re-find the index inside the updater so we operate on the live store
-      // state, not the stale component snapshot. This prevents messages added
-      // after the last render (e.g. during streaming) from being silently
-      // dropped when the truncated slice is written back.
-      const liveIndex = s.messages.findIndex((m) => m.id === userMessage!.id);
-      const cutIndex = liveIndex >= 0 ? liveIndex : userMessageIndex;
-      s.messages = s.messages.slice(0, cutIndex);
-      // Discard summaries that cover messages beyond the truncation point
-      if (s.lastSummarizeIndex > cutIndex) {
-        const validHistory = (s.memoryHistory ?? []).filter(
-          (h) => h.toIndex <= cutIndex,
-        );
-        s.memoryHistory = validHistory;
-        const lastValid = validHistory[validHistory.length - 1];
-        s.memoryPrompt = lastValid?.summary ?? "";
-        s.lastSummarizeIndex = lastValid?.toIndex ?? 0;
-      }
-    });
-    setIsLoading(true);
-    const textContent = getMessageTextContent(userMessage);
-    const images = getMessageImages(userMessage);
-    chatStore
-      .onUserInput(textContent, images)
-      .catch((e) => {
+    const userMessageId = userMessage.id;
+
+    cancelSessionMessageSync(session.id);
+    await waitForMessageSyncComplete(session.id);
+
+    await withMessageSyncBypassAsync(async () => {
+      chatStore.updateTargetSession(session, (s) => {
+        const liveIndex = s.messages.findIndex((m) => m.id === userMessageId);
+        const cutIndex = liveIndex >= 0 ? liveIndex : userMessageIndex;
+        s.messages = s.messages.slice(0, cutIndex);
+        if (s.lastSummarizeIndex > cutIndex) {
+          const validHistory = (s.memoryHistory ?? []).filter(
+            (h) => h.toIndex <= cutIndex,
+          );
+          s.memoryHistory = validHistory;
+          const lastValid = validHistory[validHistory.length - 1];
+          s.memoryPrompt = lastValid?.summary ?? "";
+          s.lastSummarizeIndex = lastValid?.toIndex ?? 0;
+        }
+      });
+
+      ChatControllerPool.stopAll();
+      cancelSessionMessageSync(session.id);
+
+      const truncated =
+        chatStore.sessions.find((s) => s.id === session.id) ?? session;
+      scheduleSessionMessagesSync(truncated, truncated.messages);
+      await waitForMessageSyncComplete(session.id);
+
+      const latestUser = truncated.messages.find((m) => m.id === userMessageId);
+      const textContent = getMessageTextContent(latestUser ?? userMessage);
+      const images = getMessageImages(latestUser ?? userMessage);
+
+      setIsLoading(true);
+      try {
+        await chatStore.onUserInput(textContent, images);
+      } catch (e) {
         console.error("[Chat] failed to resend message", e);
         showToast("消息重试失败，请稍后重试");
-      })
-      .finally(() => setIsLoading(false));
+      } finally {
+        setIsLoading(false);
+      }
+    });
     inputRef.current?.focus();
   };
 
@@ -1974,7 +1992,15 @@ function _Chat() {
                                   <IconButton
                                     icon={<EditIcon />}
                                     aria={Locale.Chat.Actions.Edit}
+                                    disabled={isMessageSyncLocked}
                                     onClick={async () => {
+                                      if (
+                                        !chatStore.ensureSessionMessageSyncUnlocked(
+                                          session.id,
+                                        )
+                                      ) {
+                                        return;
+                                      }
                                       const newMessage = await showPrompt(
                                         Locale.Chat.Actions.Edit,
                                         getMessageTextContent(message),
@@ -2064,6 +2090,7 @@ function _Chat() {
                                           text={Locale.Chat.Actions.Retry}
                                           icon={<ResetIcon />}
                                           onClick={() => onResend(message)}
+                                          disabled={isMessageSyncLocked}
                                         />
 
                                         {isUser && msgContextInfo && (
@@ -2460,7 +2487,12 @@ function _Chat() {
                   id="chat-input"
                   ref={inputRef}
                   className={styles["chat-input"]}
-                  placeholder={Locale.Chat.Input(submitKey)}
+                  placeholder={
+                    isMessageSyncLocked
+                      ? Locale.Chat.MessageSyncing
+                      : Locale.Chat.Input(submitKey)
+                  }
+                  readOnly={isMessageSyncLocked}
                   onInput={(e) => onInput(e.currentTarget.value)}
                   value={userInput}
                   onKeyDown={onInputKeyDown}
@@ -2502,6 +2534,7 @@ function _Chat() {
                   text={Locale.Chat.Send}
                   className={styles["chat-input-send"]}
                   type="primary"
+                  disabled={isMessageSyncLocked || isLoading}
                   onClick={() => doSubmit(userInput)}
                 />
               </label>
