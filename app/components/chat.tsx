@@ -54,6 +54,8 @@ import {
   Theme,
   useAccessStore,
   useAppConfig,
+  cancelSessionMessageSync,
+  scheduleSessionMessagesSync,
   useChatStore,
   usePluginStore,
 } from "../store";
@@ -1347,6 +1349,7 @@ function _Chat() {
   const onResend = async (message: ChatMessage) => {
     // Ensure no in-flight stream keeps updating truncated messages.
     // Otherwise a late onUpdate/onFinish may re-introduce "future" assistant content.
+    cancelSessionMessageSync(session.id);
     ChatControllerPool.stopAll();
 
     const resendingIndex = session.messages.findIndex(
@@ -2008,6 +2011,14 @@ function _Chat() {
                                             m.content = newContent;
                                           }
                                         },
+                                      );
+                                      const latest =
+                                        chatStore.sessions.find(
+                                          (s) => s.id === session.id,
+                                        ) ?? session;
+                                      scheduleSessionMessagesSync(
+                                        latest,
+                                        latest.messages,
                                       );
                                     }}
                                   ></IconButton>

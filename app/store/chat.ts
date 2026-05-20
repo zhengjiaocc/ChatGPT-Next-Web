@@ -254,6 +254,18 @@ const SESSION_SYNC_DEBOUNCE_MS = 500;
 const sessionSyncTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingSessionSyncPayload = new Map<string, SessionSyncPayload>();
 const sessionSyncRunning = new Map<string, boolean>();
+
+type PendingMessageSync = {
+  title: string;
+  model: string;
+  mask: Mask;
+  messages: ChatMessage[];
+};
+
+const pendingMessageSync = new Map<string, PendingMessageSync>();
+const messageSyncRunning = new Map<string, boolean>();
+const messageSyncGeneration = new Map<string, number>();
+
 export const summarizingSessionIds = new Set<string>();
 let syncFlushEventsInstalled = false;
 
@@ -262,6 +274,68 @@ function clearAllSessionSyncTasks() {
   sessionSyncTimers.clear();
   pendingSessionSyncPayload.clear();
   sessionSyncRunning.clear();
+  pendingMessageSync.clear();
+  messageSyncRunning.clear();
+  messageSyncGeneration.clear();
+}
+
+/** Invalidate in-flight chunked uploads (e.g. before resend truncates history). */
+export function cancelSessionMessageSync(sessionId: string) {
+  messageSyncGeneration.set(
+    sessionId,
+    (messageSyncGeneration.get(sessionId) ?? 0) + 1,
+  );
+}
+
+function isMessageSyncStale(sessionId: string, gen: number) {
+  return (messageSyncGeneration.get(sessionId) ?? 0) !== gen;
+}
+
+export function scheduleSessionMessagesSync(
+  session: ChatSession,
+  messages: ChatMessage[],
+) {
+  if (!isLoggedIn()) return;
+  pendingMessageSync.set(session.id, {
+    title: session.topic,
+    model: session.mask.modelConfig.model,
+    mask: session.mask,
+    messages,
+  });
+  void flushMessageSyncQueue(session.id);
+}
+
+async function flushMessageSyncQueue(sessionId: string, depth = 0) {
+  if (depth > 10) return;
+  if (messageSyncRunning.get(sessionId)) return;
+  const pending = pendingMessageSync.get(sessionId);
+  if (!pending) return;
+
+  messageSyncRunning.set(sessionId, true);
+  pendingMessageSync.delete(sessionId);
+  const gen = (messageSyncGeneration.get(sessionId) ?? 0) + 1;
+  messageSyncGeneration.set(sessionId, gen);
+
+  try {
+    await syncSessionMessagesToDB(sessionId, pending, gen);
+  } finally {
+    messageSyncRunning.set(sessionId, false);
+    if (pendingMessageSync.has(sessionId)) {
+      void flushMessageSyncQueue(sessionId, depth + 1);
+    }
+  }
+}
+
+async function waitForMessageSyncComplete(sessionId: string) {
+  for (let i = 0; i < 600; i++) {
+    if (
+      !messageSyncRunning.get(sessionId) &&
+      !pendingMessageSync.has(sessionId)
+    ) {
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
 }
 
 function buildSessionSyncPayload(
@@ -508,10 +582,14 @@ async function syncSessionToDB(session: ChatSession) {
 }
 
 async function syncSessionMessagesToDB(
-  session: ChatSession,
-  messages: ChatMessage[],
+  sessionId: string,
+  session: PendingMessageSync,
+  gen: number,
 ) {
   if (!isLoggedIn()) return;
+  if (isMessageSyncStale(sessionId, gen)) return;
+
+  const messages = session.messages;
   const persistable = messages.filter(
     (m) =>
       !!m?.id &&
@@ -549,9 +627,9 @@ async function syncSessionMessagesToDB(
     attempt: number,
   ) => {
     const body = JSON.stringify({
-      title: session.topic,
+      title: session.title,
       messages: part,
-      model: session.mask.modelConfig.model,
+      model: session.model,
       mask: session.mask,
       mode,
     });
@@ -559,14 +637,14 @@ async function syncSessionMessagesToDB(
       typeof TextEncoder !== "undefined"
         ? new TextEncoder().encode(body).length
         : body.length;
-    const res = await fetchWithTimeout(`/api/sessions/${session.id}/messages`, {
+    const res = await fetchWithTimeout(`/api/sessions/${sessionId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body,
     });
     console.log(
       "[Sync] POST messages",
-      session.id,
+      sessionId,
       part.length,
       `mode=${mode}`,
       `bytes=${payloadBytes}`,
@@ -584,15 +662,17 @@ async function syncSessionMessagesToDB(
     //   2. Each append chunk lands after the previous ones (sort_ord offset
     //      by current array length on the server side).
     //   3. If a chunk fails, retrying it is safe — append is idempotent by id.
+    if (isMessageSyncStale(sessionId, gen)) return false;
+
     const clearRes = await fetchWithTimeout(
-      `/api/sessions/${session.id}/messages`,
+      `/api/sessions/${sessionId}/messages`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: session.topic,
+          title: session.title,
           messages: [],
-          model: session.mask.modelConfig.model,
+          model: session.model,
           mask: session.mask,
           mode: "replace",
         }),
@@ -601,6 +681,7 @@ async function syncSessionMessagesToDB(
     if (!clearRes.ok) return false;
 
     for (let i = 0; i < chunks.length; i++) {
+      if (isMessageSyncStale(sessionId, gen)) return false;
       let ok = false;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
@@ -616,7 +697,7 @@ async function syncSessionMessagesToDB(
           const errText = await res.text().catch(() => "");
           console.warn(
             "[Sync] POST messages chunk non-OK",
-            session.id,
+            sessionId,
             `chunk=${i + 1}/${chunks.length}`,
             `mode=append`,
             `bytes=${payloadBytes}`,
@@ -634,9 +715,9 @@ async function syncSessionMessagesToDB(
   };
 
   const fullBody = JSON.stringify({
-    title: session.topic,
+    title: session.title,
     messages: persistable,
-    model: session.mask.modelConfig.model,
+    model: session.model,
     mask: session.mask,
     mode: "replace",
   });
@@ -647,6 +728,7 @@ async function syncSessionMessagesToDB(
 
   // Fast path for normal payloads, fallback to chunked upload on 413.
   for (let attempt = 0; attempt < 3; attempt++) {
+    if (isMessageSyncStale(sessionId, gen)) return;
     try {
       const { res } = await postOnce(persistable, "replace", attempt);
       if (res.ok) return;
@@ -657,7 +739,7 @@ async function syncSessionMessagesToDB(
         const errText = await res.text().catch(() => "");
         console.warn(
           "[Sync] POST messages non-OK",
-          session.id,
+          sessionId,
           `bytes=${fullBytes}`,
           `attempt=${attempt + 1}`,
           `status=${res.status}`,
@@ -668,7 +750,7 @@ async function syncSessionMessagesToDB(
       if (attempt === 2) {
         console.error(
           "[Sync] POST messages failed after 3 attempts",
-          session.id,
+          sessionId,
           `bytes=${fullBytes}`,
           e,
         );
@@ -686,6 +768,9 @@ async function deleteSessionFromDB(id: string) {
   sessionSyncTimers.delete(id);
   pendingSessionSyncPayload.delete(id);
   sessionSyncRunning.delete(id);
+  pendingMessageSync.delete(id);
+  messageSyncRunning.delete(id);
+  messageSyncGeneration.delete(id);
   const body = JSON.stringify({ id });
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -917,7 +1002,8 @@ export const useChatStore = createPersistStore(
             showToast("导入云端失败：请先登录账号");
             return false;
           }
-          await syncSessionMessagesToDB(sanitized, sanitized.messages);
+          scheduleSessionMessagesSync(sanitized, sanitized.messages);
+          await waitForMessageSyncComplete(sanitized.id);
           await syncSessionToDB(sanitized);
           await get().loadFromDB();
           showToast(`导入云端成功：${sanitized.messages.length} 条消息`);
@@ -1084,7 +1170,7 @@ export const useChatStore = createPersistStore(
         // does not lose newly sent input.
         const sessionAfterAppend =
           get().sessions.find((s) => s.id === session.id) ?? session;
-        void syncSessionMessagesToDB(
+        scheduleSessionMessagesSync(
           sessionAfterAppend,
           sessionAfterAppend.messages,
         );
@@ -1145,7 +1231,7 @@ export const useChatStore = createPersistStore(
             const latestSession =
               get().sessions.find((s) => s.id === session.id) ?? session;
             // full sync so resend/truncate is reflected on server
-            void syncSessionMessagesToDB(latestSession, latestSession.messages);
+            scheduleSessionMessagesSync(latestSession, latestSession.messages);
             // sync ASAP so other devices can see new messages quickly
             void flushSessionSyncQueue(session.id);
           },
@@ -1191,6 +1277,9 @@ export const useChatStore = createPersistStore(
               session.id,
               botMessage.id ?? messageIndex,
             );
+            const latestSession =
+              get().sessions.find((s) => s.id === session.id) ?? session;
+            scheduleSessionMessagesSync(latestSession, latestSession.messages);
 
             console.error("[Chat] failed ", error);
           },
@@ -1803,7 +1892,7 @@ export const useChatStore = createPersistStore(
           if (localAhead) {
             const finalSession = get().sessions.find((s) => s.id === sessionId);
             if (finalSession) {
-              void syncSessionMessagesToDB(finalSession, finalSession.messages);
+              scheduleSessionMessagesSync(finalSession, finalSession.messages);
             }
           }
         } catch (e) {
